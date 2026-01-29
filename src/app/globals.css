@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-roboto), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  /* Modern Vibrant Palette */
+  --background: #F3F4F6;
+  --foreground: #1e293b;
+
+  /* Primary Brand - Indigo/Violet Gradient Context */
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+
+  --secondary: #64748b;
+  --card-bg: #ffffff;
+}
+
+/* Enforce Light Mode & Smooth Fonts */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-jakarta), var(--font-sans), sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll from animations */
+}
+
+/* --- Glassmorphism Utilities --- */
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-panel {
+  border-radius: 2rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.glass-card {
+  border-radius: 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+/* --- Form Elements --- */
+
+input,
+select,
+textarea {
+  @apply w-full border-2 border-slate-100 text-slate-700 text-sm font-bold transition-all duration-200 outline-none;
+  padding: 0.875rem 1.25rem;
+  /* px-5 py-3.5 */
+  border-radius: 1rem;
+  /* rounded-2xl */
+  background-color: #ffffff;
+}
+
+input::placeholder,
+select::placeholder,
+textarea::placeholder {
+  color: rgba(148, 163, 184, 0.8);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(99, 102, 241, 0.3);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+label {
+  display: block;
+  font-size: 0.6875rem;
+  /* text-[11px] */
+  font-weight: 900;
+  color: #94a3b8;
+  /* slate-400 */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  /* tracking-widest */
+  margin-bottom: 0.5rem;
+  margin-left: 0.25rem;
+}
+
+/* --- Buttons --- */
+
+button.primary {
+  @apply bg-indigo-600 text-white font-bold transition-all duration-300;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
+}
+
+button.primary:hover {
+  box-shadow: 0 20px 30px -10px rgba(99, 102, 241, 0.6);
+  transform: translateY(-2px);
+}
+
+button.primary:active {
+  transform: translateY(0) scale(0.95);
+}
+
+button.secondary {
+  @apply bg-white text-slate-600 font-bold border-2 border-slate-100 shadow-sm transition-all duration-200;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1rem;
+}
+
+button.secondary:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+button.secondary:active {
+  transform: scale(0.95);
+}
+
+/* --- Scrollbar (Chrome/Edge/Safari) --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #cbd5e1;
+}
+
+/* --- Animations --- */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* --- Overrides --- */
+* {
+  font-feature-settings: "cv11", "ss01";
+}
