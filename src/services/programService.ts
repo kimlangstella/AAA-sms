@@ -8,15 +8,17 @@ export const programService = {
     // Get all programs
     getAll: async (branchId?: string): Promise<any[]> => {
         try {
-            let q = query(collection(db, COLLECTION_NAME), orderBy("name"));
+            let q = query(collection(db, COLLECTION_NAME));
             if (branchId) {
-                q = query(collection(db, COLLECTION_NAME), where("branchId", "==", branchId), orderBy("name"));
+                q = query(collection(db, COLLECTION_NAME), where("branchId", "==", branchId));
             }
             const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+            return querySnapshot.docs
+                .map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                }))
+                .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
         } catch (error) {
             console.error("Error fetching programs:", error);
             return [];
@@ -30,6 +32,28 @@ export const programService = {
             return docRef.id;
         } catch (error) {
             console.error("Error creating program:", error);
+            throw error;
+        }
+    },
+
+    // Update a program
+    update: async (id: string, data: any): Promise<void> => {
+        try {
+            const docRef = doc(db, COLLECTION_NAME, id);
+            await updateDoc(docRef, data);
+        } catch (error) {
+            console.error("Error updating program:", error);
+            throw error;
+        }
+    },
+
+    // Delete a program
+    delete: async (id: string): Promise<void> => {
+        try {
+            const docRef = doc(db, COLLECTION_NAME, id);
+            await deleteDoc(docRef);
+        } catch (error) {
+            console.error("Error deleting program:", error);
             throw error;
         }
     },

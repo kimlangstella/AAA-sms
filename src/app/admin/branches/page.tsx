@@ -30,7 +30,12 @@ export default function BranchesPage() {
     
     setSubmitting(true);
     try {
-      await branchService.create(formData);
+      await branchService.create({
+        ...formData,
+        school_id: "default", // Placeholder
+        address: "",
+        phone: ""
+      });
       setFormData({ branch_name: "", location: "" });
       setIsModalOpen(false);
       fetchBranches();

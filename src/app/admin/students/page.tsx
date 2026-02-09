@@ -1,825 +1,825 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { UserPlus, Plus, Search, Filter, Loader2, Upload, X, Pencil, Trash2, Eye, ChevronDown, Book, Settings2, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, AlertCircle, Users, CheckCircle2, ChevronRight, ShieldCheck, Calendar, CreditCard, Wallet, ChevronsRight, Check } from "lucide-react";
-import { Student, Branch, Class } from "@/lib/types";
-import { getStudents, addStudent, updateStudent, deleteStudent, uploadImage, subscribeToStudents, subscribeToClasses, addEnrollment } from "@/lib/services/schoolService";
+import { useRouter } from "next/navigation";
+import { 
+    UserPlus, Search, Filter, Loader2, Pencil, Trash2, Eye, 
+    ArrowUpDown, ArrowUp, ArrowDown, Settings2, X, ChevronDown,
+    Users, Calendar, CreditCard, Shield, Check, MoreVertical, Download
+} from "lucide-react";
+import { Student, Branch, Enrollment, Class } from "@/lib/types";
+import { 
+    subscribeToStudents, 
+    deleteStudent, 
+    subscribeToEnrollments,
+    subscribeToClasses 
+} from "@/lib/services/schoolService";
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { AddInsuranceModal } from "@/components/modals/AddInsuranceModal";
 
+// Column definition
+const ALL_COLUMNS = [
+    { key: 'action', label: 'Action', sortable: false },
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'gender', label: 'Gender', sortable: true },
+    { key: 'nationality', label: 'Nationality', sortable: true },
+    { key: 'dob', label: 'DOB', sortable: true },
+    { key: 'phone', label: 'Phone', sortable: false },
+    { key: 'branch', label: 'Branch', sortable: true },
+    { key: 'program', label: 'Program', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'admission_date', label: 'Admission Date', sortable: true },
+    // Hidden by default
+    { key: 'insurance_number', label: 'Insurance ID', sortable: false },
+    { key: 'insurance_expired', label: 'Insurance Expiry', sortable: true },
+    { key: 'created_by', label: 'Created by', sortable: true },
+    { key: 'modified_by', label: 'Modified by', sortable: true },
+    { key: 'created_at', label: 'Created at', sortable: true },
+    { key: 'updated_at', label: 'Updated at', sortable: true },
+    { key: 'payment_status', label: 'Payment Status', sortable: true },
+    { key: 'payment_expired', label: 'Payment End Date', sortable: true },
+    { key: 'payment_note', label: 'Payment Note', sortable: false },
+];
+
 export default function StudentsPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+    const router = useRouter();
 
+    // Data State
+    const [students, setStudents] = useState<Student[]>([]);
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [programs, setPrograms] = useState<any[]>([]); // any[] to handle potential type discrepancies
+    const [loading, setLoading] = useState(true);
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // UI State
-  const [showForm, setShowForm] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [createdStudentId, setCreatedStudentId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  
-  // Edit State
-  const [editStudent, setEditStudent] = useState<Student | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedBranchId, setSelectedBranchId] = useState(""); // For legacy/list filter if needed, or re-use
+    // Filter State
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterBranch, setFilterBranch] = useState("");
+    const [filterStatus, setFilterStatus] = useState(""); // Active, Inactive
+    const [filterPaymentStatus, setFilterPaymentStatus] = useState("");
 
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
+    // Sort State
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Insurance Modal State
-  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState("");
-  
-  // Advanced Features State
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Student | 'branch_name'; direction: 'asc' | 'desc' } | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(['action', 'name', 'gender', 'nationality', 'dob', 'phone', 'branch']);
-  const [showColumnSettings, setShowColumnSettings] = useState(false);
-  
-  // Wizard State
-  const [currentStep, setCurrentStep] = useState(1);
-  
-  // Controlled State for Student Profile (Step 1)
-  const [studentForm, setStudentForm] = useState({
-      first_name: "",
-      last_name: "",
-      gender: "",
-      dob: "",
-      pob: "",
-      nationality: "Cambodian",
-      phone: "",
-      email: "",
-      mother_name: "",
-      address: "",
-      parent_phone: "",
-      status: "Active",
-      admission_date: new Date().toISOString().split('T')[0]
-  });
-
-  // Controlled State for Enrollment (Step 2 & 3)
-  const [enrollmentData, setEnrollmentData] = useState({
-      branchId: "",
-      programId: "",
-      classId: "",
-      start_session: 1,
-      total_amount: "", // string to allow empty
-      discount: "",
-      paid_amount: "",
-      payment_type: "Cash",
-      payment_expired: ""
-  });
-
-  // Real-time Subscriptions
-  useEffect(() => {
-    const unsubStudents = subscribeToStudents((data) => {
-        setStudents(data);
-        setLoading(false);
-    });
-    const unsubClasses = subscribeToClasses(setClasses);
-    const unsubBranches = branchService.subscribe(setBranches);
-    const unsubPrograms = programService.subscribe(setPrograms);
+    // Column Visibility State
+    const [visibleColumns, setVisibleColumns] = useState<string[]>([
+        'action', 'name', 'gender', 'nationality', 'dob', 'phone', 'branch', 'program', 'status', 'admission_date'
+    ]);
     
-    return () => {
-        unsubStudents();
-        unsubClasses();
-        unsubBranches();
-        unsubPrograms();
+    // UI State
+    const [showFilterPanel, setShowFilterPanel] = useState(false);
+    const [showSortPanel, setShowSortPanel] = useState(false);
+    const [showColumnPanel, setShowColumnPanel] = useState(false);
+
+    // Action Menu State
+    const [activeActionId, setActiveActionId] = useState<string | null>(null);
+
+    // Modals State
+    const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+    const [selectedStudentId, setSelectedStudentId] = useState("");
+
+    // Selection State
+    const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+
+    // Fetch Data
+    useEffect(() => {
+        const unsubStudents = subscribeToStudents((data) => {
+            setStudents(data);
+            setLoading(false);
+        });
+        const unsubBranches = branchService.subscribe(setBranches);
+        const unsubEnrollments = subscribeToEnrollments(setEnrollments);
+        const unsubClasses = subscribeToClasses(setClasses);
+        const unsubPrograms = programService.subscribe(setPrograms);
+
+        return () => {
+            unsubStudents();
+            unsubBranches();
+            unsubEnrollments();
+            unsubClasses();
+            unsubPrograms();
+        };
+    }, []);
+
+    // Helper Functions
+    const calculateAge = (dob: string) => {
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
     };
-  }, []);
 
-  // Filter Classes for Step 2
-  const availableClasses = useMemo(() => {
-      return classes.filter(c => 
-          (!enrollmentData.branchId || c.branchId === enrollmentData.branchId) &&
-          (!enrollmentData.programId || c.programId === enrollmentData.programId)
-      );
-  }, [classes, enrollmentData.branchId, enrollmentData.programId]);
+    const getBranchName = (branchId: string) => {
+        return branches.find(b => b.branch_id === branchId)?.branch_name || "N/A";
+    };
 
-  // Auto-open form
-  useEffect(() => {
-    if (searchParams.get('action') === 'add' && !showForm) {
-      openAdd();
-    }
-  }, [searchParams]);
+    const getLatestEnrollment = (studentId: string) => {
+        const studentEnrollments = enrollments.filter(e => e.student_id === studentId);
+        if (studentEnrollments.length === 0) return null;
+        return studentEnrollments.sort((a, b) => 
+            new Date(b.enrolled_at).getTime() - new Date(a.enrolled_at).getTime()
+        )[0];
+    };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-          setImageFile(file);
-          const reader = new FileReader();
-          reader.onloadend = () => {
-              setImagePreview(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-      }
-  };
+    const isInsuranceExpired = (student: Student) => {
+        if (!student.insurance_info?.end_date) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDate = new Date(student.insurance_info.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        return endDate < today;
+    };
 
-  const openAdd = () => {
-      setEditStudent(null);
-      setImageFile(null);
-      setImagePreview(null);
-      // Reset State
-      setCurrentStep(1);
-      setStudentForm({
-          first_name: "", last_name: "", gender: "", dob: "", pob: "", nationality: "Cambodian",
-          phone: "", email: "", mother_name: "", address: "", parent_phone: "", status: "Active",
-          admission_date: new Date().toISOString().split('T')[0]
-      });
-      setEnrollmentData({
-        branchId: "", programId: "", classId: "", start_session: 1, 
-        total_amount: "", discount: "", paid_amount: "", payment_type: 'Cash', payment_expired: ""
-      });
-      setShowForm(true);
-      setShowSuccessModal(false);
-  }
+    // Enhanced student data with computed fields
+    const enhancedStudents = useMemo(() => {
+        return students.map(student => {
+            const latestEnrollment = getLatestEnrollment(student.student_id);
+            const insuranceExpired = isInsuranceExpired(student);
+            
+            // Resolve Program Name
+            let programName = "N/A";
+            const studentEnrollments = enrollments.filter(e => e.student_id === student.student_id);
+            
+            if (studentEnrollments.length > 0) {
+                const programNames = studentEnrollments.map(enr => {
+                    const cls = classes.find(c => c.class_id === enr.class_id);
+                    if (cls) {
+                         const program = programs.find((p: any) => p.id === cls.programId);
+                         return program ? (program.program_name || program.name) : null;
+                    }
+                    return null;
+                }).filter(Boolean); // Remove nulls
 
-  const openEdit = (student: Student) => {
-      setEditStudent(student);
-      setImagePreview(student.image_url || null);
-      setImageFile(null); 
-      setCurrentStep(1);
-      // Populate Form
-      setStudentForm({
-          first_name: student.first_name || "",
-          last_name: student.last_name || "",
-          gender: student.gender || "",
-          dob: student.dob || "",
-          pob: student.pob || "",
-          nationality: student.nationality || "Cambodian",
-          phone: student.phone || "",
-          email: student.email || "",
-          mother_name: student.mother_name || "",
-          address: student.address || "",
-          parent_phone: student.parent_phone || "",
-          status: student.status || "Active",
-          admission_date: student.admission_date || new Date().toISOString().split('T')[0]
-      });
-      // Existing students might have enrollment? For now, we only edit Profile in this wizard context conceptually
-      // We will set branchId for context if available
-      setEnrollmentData(prev => ({...prev, branchId: student.branch_id || ""}));
-
-      setShowForm(true);
-      setShowSuccessModal(false);
-  }
-
-  const handleDelete = async (id: string) => {
-      if (!confirm("Are you sure you want to delete this student?")) return;
-      try {
-          await deleteStudent(id);
-      } catch (error) {
-          console.error(error);
-          alert("Failed to delete");
-      }
-  }
-
-  const handleStudentChange = (e: any) => {
-      setStudentForm(prev => ({...prev, [e.target.name]: e.target.value}));
-  };
-
-  const handleEnrollmentChange = (e: any) => {
-    setEnrollmentData(prev => ({...prev, [e.target.name]: e.target.value}));
-  };
-
-  const handleNext = () => {
-      if (currentStep === 1) {
-          // Validate Step 1
-          if (!studentForm.first_name || !studentForm.last_name || !studentForm.gender || !studentForm.dob) {
-              alert("Please fill in all required fields (Name, Gender, DOB).");
-              return;
-          }
-          setCurrentStep(2);
-      } else if (currentStep === 2) {
-          // Validate Step 2
-          if (!enrollmentData.classId) {
-              alert("Please select a class to enroll.");
-              return;
-          }
-          setCurrentStep(3);
-      }
-  };
-
-  const handleBack = () => {
-      setCurrentStep(prev => prev - 1);
-  };
-
-  async function handleWizardSubmit(e: React.FormEvent) {
-      e.preventDefault();
-      setSubmitting(true);
-      try {
-            // 1. Upload Image
-            let imageUrl = editStudent?.image_url || "";
-            if (imageFile) {
-                imageUrl = await uploadImage(imageFile, `students/${Date.now()}_${imageFile.name}`);
+                if (programNames.length > 0) {
+                    // Deduplicate and join
+                    programName = Array.from(new Set(programNames)).join(", ");
+                }
             }
-
-            // 2. Prepare Student Data
-            const studentData: any = {
-                ...studentForm,
-                student_name: `${studentForm.first_name} ${studentForm.last_name}`.trim(),
-                student_code: editStudent?.student_code || `STU-${Date.now().toString().slice(-6)}`,
-                age: new Date().getFullYear() - new Date(studentForm.dob).getFullYear(),
-                branch_id: enrollmentData.branchId, // Link to selected branch
-                image_url: imageUrl,
+            
+            return {
+                ...student,
+                age: calculateAge(student.dob),
+                branch_name: getBranchName(student.branch_id),
+                program: programName, 
+                payment_status: latestEnrollment?.payment_status || "N/A",
+                payment_expired: latestEnrollment?.payment_expired || "N/A",
+                payment_note: "N/A",
+                insurance_number: student.insurance_info?.policy_number || "N/A",
+                insurance_expired: student.insurance_info?.end_date || "N/A",
+                insurance_status: !student.insurance_info ? "none" : insuranceExpired ? "expired" : "active",
+                created_at: student.created_at || "N/A",
+                updated_at: student.modified_at || "N/A",
             };
+        });
+    }, [students, branches, enrollments, classes, programs]);
 
-            let studentId = "";
+    // Filtered and Sorted Data
+    const filteredAndSortedStudents = useMemo(() => {
+        let filtered = enhancedStudents;
 
-            if (editStudent) {
-                await updateStudent(editStudent.student_id, studentData);
-                studentId = editStudent.student_id;
-            } else {
-                studentData.created_at = new Date().toISOString();
-                const ref = await addStudent(studentData);
-                studentId = ref.id;
+        // Search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(s => 
+                s.student_name.toLowerCase().includes(query) ||
+                s.student_code.toLowerCase().includes(query) ||
+                s.phone.toLowerCase().includes(query)
+            );
+        }
+
+        // Branch filter
+        if (filterBranch) {
+            filtered = filtered.filter(s => s.branch_id === filterBranch);
+        }
+
+        // Status filter
+        if (filterStatus) {
+            filtered = filtered.filter(s => s.status === filterStatus);
+        }
+
+        // Payment Status filter
+        if (filterPaymentStatus) {
+            filtered = filtered.filter(s => s.payment_status === filterPaymentStatus);
+        }
+
+        // Insurance Status filter (Generic check if used)
+
+        // Sorting
+        if (sortConfig) {
+            filtered.sort((a, b) => {
+                const aVal = a[sortConfig.key as keyof typeof a];
+                const bVal = b[sortConfig.key as keyof typeof b];
+                
+                if (aVal === null || aVal === undefined || aVal === "N/A") return 1;
+                if (bVal === null || bVal === undefined || bVal === "N/A") return -1;
+                
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [enhancedStudents, searchQuery, filterBranch, filterStatus, filterPaymentStatus, sortConfig]);
+
+    // Sorting Handler
+    const handleSort = (key: string) => {
+        setSortConfig(prev => {
+            if (!prev || prev.key !== key) {
+                return { key, direction: 'asc' };
             }
-
-            // 3. Create Enrollment (Rule: Always create enrollment for New Admission)
-            // If editing, maybe we don't want to re-enroll? 
-            // The prompt "after we create student next step is enrollment" implies New Admission flow.
-            // If editing existing student, usually we skip enrollment or handle in separate tab.
-            // But let's support it if classId is picked.
-            if (enrollmentData.classId) {
-                await addEnrollment({
-                    class_id: enrollmentData.classId,
-                    student_id: studentId,
-                    start_session: Number(enrollmentData.start_session),
-                    total_amount: Number(enrollmentData.total_amount) || 0,
-                    discount: Number(enrollmentData.discount) || 0,
-                    paid_amount: Number(enrollmentData.paid_amount) || 0,
-                    payment_status: (Number(enrollmentData.paid_amount) >= (Number(enrollmentData.total_amount) - Number(enrollmentData.discount))) && Number(enrollmentData.total_amount) > 0 ? 'Paid' : 'Unpaid',
-                    payment_type: enrollmentData.payment_type,
-                    payment_expired: enrollmentData.payment_expired,
-                    payment_date: new Date().toISOString()
-                });
+            if (prev.direction === 'asc') {
+                return { key, direction: 'desc' };
             }
+            return null;
+        });
+    };
 
-            setShowForm(false);
-            setCreatedStudentId(studentId);
+    // Column Visibility Toggle
+    const toggleColumn = (columnKey: string) => {
+        setVisibleColumns(prev => 
+            prev.includes(columnKey)
+                ? prev.filter(k => k !== columnKey)
+                : [...prev, columnKey]
+        );
+    };
 
-      } catch (error) {
-          console.error(error);
-          alert("Failed to submit.");
-      } finally {
-          setSubmitting(false);
-      }
-  }
+    const handleDelete = async (studentId: string) => {
+        if (!confirm("Are you sure you want to delete this student?")) return;
+        try {
+            await deleteStudent(studentId);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to delete student");
+        }
+    };
 
-  const getBranchName = (branchId: string) => {
-      return branches.find(b => b.branch_id === branchId)?.branch_name || "Unknown Branch";
-  };
+    const handleBulkDelete = async () => {
+        if (!confirm(`Are you sure you want to delete ${selectedStudents.size} students? This action cannot be undone.`)) return;
+        
+        try {
+            setLoading(true);
+            await Promise.all(
+                Array.from(selectedStudents).map(id => deleteStudent(id))
+            );
+            setSelectedStudents(new Set());
+            // Data subscription will auto-update the list
+        } catch (error) {
+            console.error("Bulk delete failed:", error);
+            alert("Failed to delete some students");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const filteredStudents = useMemo(() => {
-     const enriched = students.map(s => ({
-         ...s,
-         branch_name: branches.find(b => b.branch_id === s.branch_id)?.branch_name || ""
-     }));
+    // Selection Handlers
+    const handleSelectAll = () => {
+        if (selectedStudents.size === filteredAndSortedStudents.length) {
+            setSelectedStudents(new Set());
+        } else {
+            setSelectedStudents(new Set(filteredAndSortedStudents.map(s => s.student_id)));
+        }
+    };
 
-     if (!searchQuery) return enriched;
-     
-     const query = searchQuery.toLowerCase();
-     return enriched.filter(s => 
-        (s.student_name && s.student_name.toLowerCase().includes(query)) ||
-        (s.student_code && s.student_code.toLowerCase().includes(query)) ||
-        (s.phone && s.phone.toLowerCase().includes(query)) ||
-        (s.nationality && s.nationality.toLowerCase().includes(query)) ||
-        (s.dob && s.dob.toLowerCase().includes(query)) ||
-        (s.branch_name && s.branch_name.toLowerCase().includes(query))
-     );
-  }, [students, branches, searchQuery]);
+    const handleSelectStudent = (id: string) => {
+        const newSelected = new Set(selectedStudents);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedStudents(newSelected);
+    };
 
+    const handleExport = () => {
+        const headers = ['Student ID', 'Name', 'Gender', 'DOB', 'Branch', 'Program', 'Status', 'Payment Status'];
+        const data = filteredAndSortedStudents.map(s => [
+            s.student_code,
+            s.student_name,
+            s.gender,
+            s.dob,
+            s.branch_name,
+            s.program,
+            s.status,
+            s.payment_status
+        ]);
+        
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
 
-  const toggleSort = (key: keyof Student | 'branch_name') => {
-      let direction: 'asc' | 'desc' = 'asc';
-      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-          direction = 'desc';
-      }
-      setSortConfig({ key, direction });
-  };
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `students_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
-  const renderSortIcon = (key: keyof Student | 'branch_name') => {
-      if (sortConfig?.key !== key) return <ArrowUpDown size={12} className="opacity-30" />;
-      return sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-indigo-600" /> : <ArrowDown size={12} className="text-indigo-600" />;
-  };
-
-  const columns = [
-      { id: 'action', label: 'Action' },
-      { id: 'name', label: 'Name', sortKey: 'student_name' },
-      { id: 'gender', label: 'Gender', sortKey: 'gender' },
-      { id: 'status', label: 'Status', sortKey: 'status' },
-      { id: 'nationality', label: 'Nationality', sortKey: 'nationality' },
-      { id: 'dob', label: 'Date of Birth', sortKey: 'dob' },
-      { id: 'phone', label: 'Phone', sortKey: 'phone' },
-      { id: 'branch', label: 'Branch', sortKey: 'branch_name' },
-  ];
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="animate-spin text-indigo-500" size={48} />
+            </div>
+        );
+    }
 
     return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 glass p-3 px-5 rounded-3xl shadow-sm">
-        <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                <Users size={16} />
+        <div className="max-w-[98%] mx-auto space-y-6 pb-8">
+            
+            {/* Header / Title */}
+            <div className="flex items-center justify-between py-2">
+                 <h1 className="text-2xl font-black text-slate-800">Students <span className="text-sm font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-2">{filteredAndSortedStudents.length}</span></h1>
             </div>
-            <h1 className="text-lg font-bold text-slate-800">Students </h1>
-        </div>
-        <div className="flex gap-3">
-        <div className="flex gap-3">
-             <button 
-                onClick={openAdd} 
-                disabled={branches.length === 0}
-                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
-            >
-                <UserPlus size={16} />
-                <span>Admission</span>
-            </button>
-        </div>
-        </div>
-      </div>
 
-       {/* SUCCESS MODAL */}
-       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-             <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 text-center space-y-6 animate-in zoom-in-95 duration-200">
-                  <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 size={40} />
-                  </div>
-                  <div>
-                      <h3 className="text-2xl font-black text-slate-900">Admission Complete!</h3>
-                      <p className="text-slate-500 font-medium mt-2">The student profile has been created successfully.</p>
-                  </div>
-                  
-                  <div className="space-y-3 pt-2">
-                       <button 
-                         onClick={() => router.push(`/admin/enrollments`)}
-                         className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
-                       >
-                          <span>Enroll in Class Now</span>
-                          <ChevronRight size={16} />
-                       </button>
-                       <button 
-                         onClick={() => setShowSuccessModal(false)}
-                         className="w-full py-3.5 bg-white border-2 border-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all"
-                       >
-                          Create Another / Close
-                       </button>
-                  </div>
-             </div>
-        </div>
-      )}
-
-      {/* INSURANCE MODAL */}
-      <AddInsuranceModal 
-        isOpen={showInsuranceModal} 
-        onClose={() => setShowInsuranceModal(false)}
-        studentId={selectedStudentId}
-        onSuccess={() => {
-            alert("Insurance added successfully!");
-            // Optionally refresh students data if needed
-        }} 
-      />
-
-
-      {showForm ? (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white w-full rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden">
-                {/* WIZARD HEADER */}
-                <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            {/* Bulk Actions Header (Overrides Toolbar if selection active) */}
+            {selectedStudents.size > 0 && (
+                <div className="sticky top-4 z-40 bg-indigo-900 text-white p-4 rounded-2xl shadow-xl flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                             <UserPlus size={20} />
+                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-white">
+                            {selectedStudents.size}
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-900">
-                                {editStudent ? "Edit Student Profile" : "New Admission"}
-                            </h2>
-                            <p className="text-xs font-bold text-slate-400">Step {currentStep} of 3</p>
+                            <p className="font-bold text-white text-sm">Students Selected</p>
+                            <p className="text-xs text-indigo-200">Apply actions to selected items</p>
                         </div>
                     </div>
-                    {/* STEP INDICATOR */}
-                    <div className="hidden md:flex items-center gap-2">
-                         {[1, 2, 3].map(step => (
-                             <div key={step} className={`h-2 rounded-full transition-all duration-300 ${step <= currentStep ? 'w-12 bg-indigo-500' : 'w-4 bg-slate-200'}`} />
-                         ))}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setSelectedStudents(new Set())}
+                            className="px-4 py-2 rounded-xl bg-transparent hover:bg-white/10 text-white text-xs font-bold transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <div className="w-px h-8 bg-white/10 mx-2" />
+                        <button
+                            onClick={handleBulkDelete}
+                            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-lg shadow-rose-900/20"
+                        >
+                            <Trash2 size={16} />
+                            <span>Delete Selected</span>
+                        </button>
                     </div>
-                    <button 
-                        onClick={() => setShowForm(false)} 
-                        className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
+            )}
+
+            {/* TOOLBAR */}
+            <div className={`flex flex-col md:flex-row items-center justify-between gap-3 ${selectedStudents.size > 0 ? 'opacity-50 pointer-events-none filter blur-[1px]' : ''}`}>
                 
-                <div className="p-8 bg-white min-h-[500px]">
-                    <form onSubmit={handleWizardSubmit} className="space-y-8">
-                        
-                        {/* STEP 1: STUDENT PROFILE */}
-                        <div style={{ display: currentStep === 1 ? 'block' : 'none' }} className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
-                                {/* Photo Upload Section */}
-                                <div className="flex justify-center border-b border-slate-100 pb-8">
-                                     <div className="flex flex-col items-center gap-4">
-                                        <div className="relative group">
-                                            <div className="w-24 h-24 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-400 group-hover:bg-indigo-50/30 shadow-inner">
-                                                {imagePreview || editStudent?.image_url ? (
-                                                    <img src={imagePreview || editStudent?.image_url!} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                                ) : (
-                                                    <Upload className="text-slate-300 group-hover:text-indigo-400 transition-colors" size={24} />
-                                                )}
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*" 
-                                                    onChange={handleImageChange}
-                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20" 
-                                                />
-                                            </div>
-                                            <p className="text-[10px] font-bold text-slate-400 text-center mt-2 uppercase tracking-wider">Photo</p>
-                                        </div>
-                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <InputField name="first_name" label="First Name" required value={studentForm.first_name} onChange={handleStudentChange} />
-                                    <InputField name="last_name" label="Last Name" required value={studentForm.last_name} onChange={handleStudentChange} />
-                                    <SelectField name="gender" label="Gender" required value={studentForm.gender} onChange={handleStudentChange}>
-                                        <option value="">Select Gender</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                    </SelectField>
-
-                                    <InputField name="dob" type="date" label="Date of Birth" required value={studentForm.dob} onChange={handleStudentChange} />
-                                    <InputField name="phone" label="Phone" required value={studentForm.phone} onChange={handleStudentChange} />
-                                    
-                                    <SelectField name="nationality" label="Nationality" required value={studentForm.nationality} onChange={handleStudentChange}>
-                                        <option value="Cambodian">Cambodian</option>
-                                        <option value="Other">Other</option>
-                                    </SelectField>
-
-                                    <SelectField name="status" label="Status" required value={studentForm.status} onChange={handleStudentChange}>
-                                        <option value="Active">Active</option>
-                                        <option value="Inactive">Inactive</option>
-                                        <option value="Hold">Hold</option>
-                                    </SelectField>
-
-                                    <InputField name="address" label="Address" value={studentForm.address} onChange={handleStudentChange} />
-                                    <InputField name="parent_phone" label="Parent's Contact" value={studentForm.parent_phone} onChange={handleStudentChange} />
-                                </div>
-                        </div>
-
-                        {/* STEP 2: CLASS ENROLLMENT */}
-                        {currentStep === 2 && (
-                            <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
-                                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-6">
-                                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                                        <Book size={18} className="text-indigo-600" />
-                                        Academic Details
-                                    </h3>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <SelectField 
-                                            label="Select Branch" 
-                                            required 
-                                            value={enrollmentData.branchId} 
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, branchId: e.target.value, classId: ""})}
-                                        >
-                                            <option value="">Choose Branch...</option>
-                                            {branches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
-                                        </SelectField>
-
-                                        <SelectField 
-                                            label="Select Program" 
-                                            value={enrollmentData.programId} 
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, programId: e.target.value, classId: ""})}
-                                        >
-                                            <option value="">All Programs</option>
-                                            {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                        </SelectField>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-wide">Select Class to Enroll</label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
-                                            {availableClasses.length === 0 ? (
-                                                <div className="col-span-full py-8 text-center text-slate-400 text-xs font-bold bg-white rounded-xl border border-dashed border-slate-200">
-                                                    No classes found for selection (Select Branch first)
-                                                </div>
-                                            ) : availableClasses.map(cls => (
-                                                <div 
-                                                    key={cls.class_id}
-                                                    onClick={() => setEnrollmentData({...enrollmentData, classId: cls.class_id!})}
-                                                    className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex items-center justify-between group ${enrollmentData.classId === cls.class_id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
-                                                >
-                                                    <div>
-                                                        <p className={`text-xs font-bold ${enrollmentData.classId === cls.class_id ? 'text-indigo-700' : 'text-slate-700'}`}>{cls.className}</p>
-                                                        <p className="text-[10px] text-slate-400 font-medium">{cls.days} • {cls.startTime}</p>
-                                                    </div>
-                                                    {enrollmentData.classId === cls.class_id && <CheckCircle2 size={16} className="text-indigo-600" />}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {enrollmentData.classId && (
-                                        <div className="grid grid-cols-2 gap-6 animate-in fade-in">
-                                            <InputField 
-                                                label="Start Session" 
-                                                type="number" 
-                                                value={enrollmentData.start_session}
-                                                onChange={(e: any) => setEnrollmentData({...enrollmentData, start_session: e.target.value})}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* STEP 3: PAYMENT */}
-                        {currentStep === 3 && (
-                            <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
-                                <div className="p-6 rounded-2xl bg-amber-50/50 border border-amber-100 space-y-6">
-                                    <h3 className="text-sm font-black text-amber-900 flex items-center gap-2">
-                                        <Wallet size={18} className="text-amber-600" />
-                                        Tuition Payment
-                                    </h3>
-
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <InputField 
-                                            label="Total Amount ($)" 
-                                            type="number" 
-                                            value={enrollmentData.total_amount}
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, total_amount: e.target.value})}
-                                        />
-                                        <InputField 
-                                            label="Discount ($)" 
-                                            type="number" 
-                                            value={enrollmentData.discount}
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, discount: e.target.value})}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <InputField 
-                                            label="Paid Amount ($)" 
-                                            type="number" 
-                                            value={enrollmentData.paid_amount}
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, paid_amount: e.target.value})}
-                                        />
-                                        <SelectField 
-                                            label="Payment Type" 
-                                            value={enrollmentData.payment_type}
-                                            onChange={(e: any) => setEnrollmentData({...enrollmentData, payment_type: e.target.value})}
-                                        >
-                                            <option value="Cash">Cash</option>
-                                            <option value="ABA">ABA PayWay</option>
-                                            <option value="Bank">Bank Transfer</option>
-                                        </SelectField>
-                                    </div>
-                                    <InputField 
-                                        label="Next Payment Due" 
-                                        type="date" 
-                                        value={enrollmentData.payment_expired}
-                                        onChange={(e: any) => setEnrollmentData({...enrollmentData, payment_expired: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex justify-between items-center pt-8 border-t border-slate-100">
-                            {currentStep === 1 ? (
-                                <button 
-                                    type="submit" 
-                                    disabled={submitting}
-                                    className="px-6 py-3 rounded-xl text-indigo-600 font-bold text-xs hover:bg-indigo-50 border border-indigo-100 transition-all flex items-center gap-2 disabled:opacity-70"
-                                >
-                                    {submitting ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                                    <span>Save Student Only</span>
-                                </button>
-                            ) : (
-                                <button 
-                                    type="button" 
-                                    onClick={handleBack}
-                                    className="px-6 py-3 rounded-xl text-slate-500 font-bold text-xs hover:bg-slate-50 transition-all flex items-center gap-2"
-                                >
-                                    <ArrowUpDown className="rotate-90" size={14} /> Back
-                                </button>
-                            )}
-
-                            <div className="flex gap-4">
-                                {currentStep < 3 ? (
-                                    <button 
-                                        type="button" 
-                                        onClick={handleNext}
-                                        disabled={submitting}
-                                        className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-70"
-                                    >
-                                        <span>{currentStep === 1 ? 'Proceed to Enrollment' : 'Next Step'}</span>
-                                        <ChevronsRight size={16} />
-                                    </button>
-                                ) : (
-                                    <button 
-                                        type="submit"
-                                        disabled={submitting} 
-                                        className="px-10 py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all flex items-center gap-2 disabled:opacity-70"
-                                    >
-                                        {submitting ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
-                                        <span>Confirm Admission</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-      ) : (
-        <div className="glass-panel overflow-hidden shadow-sm animate-in fade-in duration-500">
-            {/* SEARCH & FILTERS */}
-            {/* <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-6 justify-between items-center bg-slate-50/20">
-                <div className="flex items-center w-full max-w-sm px-3 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm focus-within:ring-4 focus-within:ring-indigo-100 focus-within:border-indigo-500 transition-all">
-                    <Search size={14} className="text-slate-400" />
-                    <div className="w-px h-3 mx-2 bg-slate-200" />
-                    <input 
-                        placeholder="Search..." 
+                {/* Search */}
+                <div className="relative w-full md:w-96">
+                    <input
+                        type="text"
+                        placeholder="Search..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-slate-700 placeholder:text-slate-400 p-0" 
+                        className="w-full pl-6 pr-12 py-3 bg-white text-slate-700 rounded-full border border-slate-100 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-medium"
                     />
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 </div>
-                <div className="relative">
-                    <button onClick={() => setShowColumnSettings(!showColumnSettings)} className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-all text-xs font-bold shadow-sm">
-                        <Settings2 size={14} />
-                        <span>Columns</span>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                    
+                    {/* Filter Button */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => { setShowFilterPanel(!showFilterPanel); setShowSortPanel(false); setShowColumnPanel(false); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
+                        >
+                            <Filter size={16} />
+                            <span>Filter</span>
+                        </button>
+
+                        {/* Filter Popup - Dark */}
+                        {showFilterPanel && (
+                            <>
+                                <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1">
+                                        
+                                        {/* Status */}
+                                        <div className="px-2 py-2">
+                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Status</h4>
+                                            <div className="space-y-0.5">
+                                                {['Active', 'Inactive', 'Hold'].map(status => (
+                                                    <button
+                                                        key={status}
+                                                        onClick={() => setFilterStatus(filterStatus === status ? "" : status)}
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                    >
+                                                        <span>{status}</span>
+                                                        {filterStatus === status && <Check size={14} className="text-indigo-500" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-zinc-800 my-1" />
+
+                                        {/* Branch */}
+                                        <div className="px-2 py-2">
+                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Branch</h4>
+                                            <div className="space-y-0.5">
+                                                {branches.map(b => (
+                                                    <button
+                                                        key={b.branch_id}
+                                                        onClick={() => setFilterBranch(filterBranch === b.branch_id ? "" : b.branch_id)}
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                    >
+                                                        <span className="truncate">{b.branch_name}</span>
+                                                        {filterBranch === b.branch_id && <Check size={14} className="text-indigo-500" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                         <div className="h-px bg-zinc-800 my-1" />
+
+                                         {/* Payment Status */}
+                                         <div className="px-2 py-2">
+                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Payment</h4>
+                                            <div className="space-y-0.5">
+                                                {['Paid', 'Unpaid'].map(status => (
+                                                    <button
+                                                        key={status}
+                                                        onClick={() => setFilterPaymentStatus(filterPaymentStatus === status ? "" : status)}
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                    >
+                                                        <span>{status}</span>
+                                                        {filterPaymentStatus === status && <Check size={14} className="text-indigo-500" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Sort Button */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => { setShowSortPanel(!showSortPanel); setShowFilterPanel(false); setShowColumnPanel(false); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
+                        >
+                            <ArrowUpDown size={16} />
+                            <span>Sort</span>
+                        </button>
+
+                         {/* Sort Popup - Dark */}
+                         {showSortPanel && (
+                            <>
+                                <div className="fixed inset-0 z-20" onClick={() => setShowSortPanel(false)} />
+                                <div className="absolute top-full right-0 mt-2 w-56 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="p-1 space-y-0.5">
+                                        {[
+                                            { label: 'Admission Date', key: 'admission_date' },
+                                            { label: 'Name', key: 'name' }
+                                        ].map((opt) => (
+                                             <button
+                                                key={opt.key}
+                                                onClick={() => handleSort(opt.key)}
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                            >
+                                                <span>{opt.label}</span>
+                                                {sortConfig?.key === opt.key && (
+                                                    sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-indigo-500" /> : <ArrowDown size={14} className="text-indigo-500" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                         )}
+                    </div>
+
+                    {/* Columns Button */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => { setShowColumnPanel(!showColumnPanel); setShowFilterPanel(false); setShowSortPanel(false); }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
+                        >
+                            <Settings2 size={16} />
+                            <span>Columns</span>
+                        </button>
+
+                        {/* Column Popup - Dark & Long List */}
+                         {showColumnPanel && (
+                            <>
+                                <div className="fixed inset-0 z-20" onClick={() => setShowColumnPanel(false)} />
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                     <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+                                        {ALL_COLUMNS.map(col => (
+                                            <button
+                                                key={col.key}
+                                                onClick={() => toggleColumn(col.key)}
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left group"
+                                            >
+                                                <span className={`${visibleColumns.includes(col.key) ? 'text-zinc-200' : 'text-zinc-500'}`}>{col.label}</span>
+                                                {visibleColumns.includes(col.key) && <Check size={14} className="text-white" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                         )}
+                    </div>
+
+                    {/* Admission Button */}
+                    <button
+                        onClick={() => router.push('/admin/students/add')}
+                        className="ml-2 flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200/50"
+                    >
+                        <UserPlus size={18} />
+                        <span>Admission</span>
                     </button>
-                    {showColumnSettings && (
-                        <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-6 animate-in fade-in zoom-in-95 duration-200">
-                             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 px-1">Customize View</h3>
-                             <div className="space-y-1">
-                                {columns.map(col => (
-                                    <label key={col.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors group">
+
+                    {/* Export Button */}
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-full text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50"
+                        title="Export CSV"
+                    >
+                        <Download size={18} />
+                    </button>
+
+                </div>
+            </div>
+
+            {/* TABLE */}
+            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="overflow-x-auto min-h-[400px]">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="bg-white border-b border-slate-100">
+                                <th className="px-6 py-4 w-12">
+                                    <div className="flex items-center justify-center">
                                         <input 
                                             type="checkbox" 
-                                            checked={visibleColumns.includes(col.id)} 
-                                            onChange={() => setVisibleColumns(prev => prev.includes(col.id) ? prev.filter(i => i !== col.id) : [...prev, col.id])}
-                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                            checked={filteredAndSortedStudents.length > 0 && selectedStudents.size === filteredAndSortedStudents.length}
+                                            onChange={handleSelectAll}
                                         />
-                                        <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{col.label}</span>
-                                    </label>
-                                ))}
-                             </div>
-                        </div>
-                    )}
-                </div>
-            </div> */}
-
-            {loading ? (
-                <div className="p-32 flex justify-center"><Loader2 className="animate-spin text-indigo-500" size={48} /></div>
-            ) : (
-                <div className="overflow-x-auto min-h-[400px]">
-                    <table className="w-full text-xs text-left border-collapse">
-                        <thead className="text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/50 border-b border-slate-100">
-                            <tr>
-                                {columns.filter(c => visibleColumns.includes(c.id)).map(col => (
-                                    <th 
-                                        key={col.id} 
-                                        className={`px-8 py-5 font-bold whitespace-nowrap ${col.sortKey ? 'cursor-pointer hover:bg-slate-100/50 transition-colors' : ''}`}
-                                        onClick={() => col.sortKey && toggleSort(col.sortKey as any)}
+                                    </div>
+                                </th>
+                                {ALL_COLUMNS.filter(col => visibleColumns.includes(col.key)).map((col, index) => (
+                                    <th
+                                        key={col.key}
+                                        className={`text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider ${
+                                            col.sortable ? 'cursor-pointer hover:text-indigo-600 transition-colors' : ''
+                                        } ${col.key === 'name' ? 'min-w-[300px]' : ''} ${col.key === 'dob' ? 'min-w-[150px]' : ''}`}
+                                        onClick={() => col.sortable && handleSort(col.key)}
                                     >
                                         <div className="flex items-center gap-2">
                                             <span>{col.label}</span>
-                                            {col.sortKey && renderSortIcon(col.sortKey as any)}
+                                            {col.sortable && (
+                                                <span className="text-slate-300">
+                                                    {sortConfig?.key === col.key ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                                                    ) : (
+                                                        <ArrowUpDown size={12} />
+                                                    )}
+                                                </span>
+                                            )}
                                         </div>
                                     </th>
                                 ))}
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {filteredStudents.map(s => (
-                                <tr key={s.student_id} className="hover:bg-slate-50/80 transition-colors group">
-                                    {visibleColumns.includes('action') && (
-                                        <td className="px-8 py-4">
-                                            <div className="flex gap-2 transition-opacity">
-                                                <button onClick={() => openEdit(s)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Edit">
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button 
-                                                    onClick={() => {
-                                                        setSelectedStudentId(s.student_id);
-                                                        setShowInsuranceModal(true);
-                                                    }} 
-                                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                    title="Add Insurance"
-                                                >
-                                                    <ShieldCheck size={14} />
-                                                </button>
-                                                <button onClick={() => handleDelete(s.student_id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {filteredAndSortedStudents.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={visibleColumns.length + 1} className="p-16 text-center text-slate-400 text-sm font-medium">
+                                            No students found matching your criteria.
                                         </td>
-                                    )}
-                                    {visibleColumns.includes('name') && (
-                                        <td className="px-8 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs flex-shrink-0 overflow-hidden">
-                                                    {s.image_url ? <img src={s.image_url} alt="" className="w-full h-full object-cover" /> : s.student_name.charAt(0)}
+                                    </tr>
+                                ) : (
+                                    filteredAndSortedStudents.map(student => (
+                                        <tr key={student.student_id} className={`hover:bg-slate-50/80 transition-colors group ${selectedStudents.has(student.student_id) ? 'bg-indigo-50/30' : ''}`}>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center justify-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                        checked={selectedStudents.has(student.student_id)}
+                                                        onChange={() => handleSelectStudent(student.student_id)}
+                                                    />
                                                 </div>
-                                                <div>
-                                                    <div className="font-bold text-slate-900">{s.student_name}</div>
-                                                    <div className="text-[9px] font-bold text-slate-400 tracking-wider">REF: {s.student_code}</div>
+                                            </td>
+                                        {visibleColumns.includes('action') && (
+                                            <td className="p-4 pl-6">
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveActionId(activeActionId === student.student_id ? null : student.student_id);
+                                                        }}
+                                                        className="p-2 rounded-xl hover:bg-white hover:shadow-md text-slate-400 hover:text-indigo-600 transition-all"
+                                                    >
+                                                        <MoreVertical size={18} />
+                                                    </button>
+                                                    
+                                                    {activeActionId === student.student_id && (
+                                                        <>
+                                                            <div 
+                                                                className="fixed inset-0 z-20" 
+                                                                onClick={() => setActiveActionId(null)}
+                                                            />
+                                                            <div className="absolute left-0 bottom-full mb-2 flex items-center gap-1 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                                                <button
+                                                                    onClick={() => router.push(`/admin/students/${student.student_id}`)}
+                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                                                                    title="View Details"
+                                                                >
+                                                                    <Eye size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => router.push(`/admin/students/edit/${student.student_id}`)}
+                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                                                                    title="Edit Profile"
+                                                                >
+                                                                    <Pencil size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedStudentId(student.student_id);
+                                                                        setShowInsuranceModal(true);
+                                                                        setActiveActionId(null);
+                                                                    }}
+                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                                                                    title="Insurance"
+                                                                >
+                                                                    <Shield size={16} />
+                                                                </button>
+                                                                <div className="w-px h-6 bg-slate-100 mx-1"/>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        handleDelete(student.student_id);
+                                                                        setActiveActionId(null);
+                                                                    }}
+                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        </td>
-                                    )}
-                                    {visibleColumns.includes('gender') && (
-                                        <td className="px-8 py-4">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-bold w-12 inline-block text-center border ${
-                                                s.gender === 'Female' ? 'bg-pink-50 text-pink-600 border-pink-100/50' : 'bg-blue-50 text-blue-600 border-blue-100/50'
-                                            }`}>
-                                                {s.gender}
-                                            </span>
-                                        </td>
-                                    )}
-                                    {visibleColumns.includes('status') && (
-                                        <td className="px-8 py-4">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-bold inline-block text-center border ${
-                                                s.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100/50' : 
-                                                s.status === 'Hold' ? 'bg-amber-50 text-amber-600 border-amber-100/50' :
-                                                'bg-slate-50 text-slate-600 border-slate-100/50'
-                                            }`}>
-                                                {s.status}
-                                            </span>
-                                        </td>
-                                    )}
-                                    {visibleColumns.includes('nationality') && <td className="px-8 py-4 text-slate-600">{s.nationality}</td>}
-                                    {visibleColumns.includes('dob') && <td className="px-8 py-4 text-slate-600">{s.dob}</td>}
-                                    {visibleColumns.includes('phone') && <td className="px-8 py-4 text-slate-500 font-medium">{s.phone}</td>}
-                                    {visibleColumns.includes('branch') && (
-                                        <td className="px-8 py-4">
-                                            <div className="px-3 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[9px] font-bold text-slate-500 inline-block">
-                                                {s.branch_name}
-                                            </div>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('name') && (
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-500 overflow-hidden border-2 border-white shadow-sm">
+                                                        {student.image_url ? (
+                                                            <img src={student.image_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            student.student_name.charAt(0)
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{student.student_name}</p>
+                                                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{student.student_code}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('gender') && (
+                                            <td className="p-4">
+                                                <span className="font-bold text-slate-600 text-sm">{student.gender}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('nationality') && (
+                                            <td className="p-4">
+                                                <span className="font-bold text-slate-600 text-sm">{student.nationality}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('dob') && (
+                                            <td className="p-4">
+                                                <span className="font-semibold text-slate-600 text-sm">{student.dob}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('phone') && (
+                                            <td className="p-4">
+                                                <span className="font-semibold text-slate-500 text-sm">{student.phone}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('branch') && (
+                                            <td className="p-4">
+                                                <span className="inline-flex px-3 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold border border-slate-100">
+                                                    {student.branch_name}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('program') && (
+                                            <td className="p-4">
+                                                <span className="text-sm font-medium text-slate-500">{student.program}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('status') && (
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full ${
+                                                        student.status === 'Active' ? 'bg-emerald-500' :
+                                                        student.status === 'Hold' ? 'bg-amber-500' :
+                                                        'bg-slate-300'
+                                                    }`} />
+                                                    <span className={`text-xs font-bold ${
+                                                        student.status === 'Active' ? 'text-emerald-700' :
+                                                        student.status === 'Hold' ? 'text-amber-700' :
+                                                        'text-slate-500'
+                                                    }`}>
+                                                        {student.status}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('admission_date') && (
+                                            <td className="p-4">
+                                                <span className="font-semibold text-slate-600 text-sm">{student.admission_date}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('payment_status') && (
+                                            <td className="p-4">
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${
+                                                    student.payment_status === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+                                                    student.payment_status === 'Unpaid' ? 'bg-rose-50 border-rose-100 text-rose-700' :
+                                                    'bg-slate-50 border-slate-100 text-slate-500'
+                                                }`}>
+                                                    {student.payment_status}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('payment_expired') && (
+                                            <td className="p-4">
+                                                <span className="font-semibold text-slate-600 text-sm">
+                                                    {student.payment_expired !== 'N/A' 
+                                                        ? new Date(student.payment_expired).toLocaleDateString()
+                                                        : 'N/A'
+                                                    }
+                                                </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('insurance_number') && (
+                                            <td className="p-4">
+                                                <span className="font-mono text-slate-500 text-xs font-bold">{student.insurance_number}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('insurance_expired') && (
+                                            <td className="p-4">
+                                                <span className={`font-bold text-xs uppercase tracking-wider ${
+                                                    student.insurance_status === 'expired' ? 'text-rose-600' :
+                                                    student.insurance_status === 'active' ? 'text-emerald-600' :
+                                                    'text-slate-300'
+                                                }`}>
+                                                    {student.insurance_expired !== 'N/A'
+                                                        ? new Date(student.insurance_expired).toLocaleDateString()
+                                                        : 'N/A'
+                                                    }
+                                                </span>
+                                            </td>
+                                        )}
+                                        {/* Fallback for other columns */}
+                                        {['created_by', 'modified_by', 'created_at', 'updated_at', 'payment_note'].map(colKey => {
+                                            if (visibleColumns.includes(colKey)) {
+                                                const val = (student as any)[colKey] || 'N/A';
+                                                return (
+                                                    <td key={colKey} className="p-4">
+                                                        <span className="text-slate-500 text-xs font-medium">{val}</span>
+                                                    </td>
+                                                )
+                                            }
+                                            return null;
+                                        })}
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* MODALS */}
+            {showInsuranceModal && (
+                <AddInsuranceModal
+                    isOpen={showInsuranceModal}
+                    onClose={() => setShowInsuranceModal(false)}
+                    studentId={selectedStudentId}
+                    onSuccess={() => setShowInsuranceModal(false)}
+                />
             )}
         </div>
-      )}
-    </div>
-  );
-}
-
-function InputField({ label, name, type = "text", required = false, defaultValue, placeholder, value, onChange, disabled }: any) {
-    return (
-        <div className="space-y-2 group">
-            <label className="block text-[10px] font-bold text-slate-400 ml-1 group-focus-within:text-indigo-600 transition-colors">
-                {label} {required && <span className="text-rose-500">*</span>}
-            </label>
-            <input 
-                name={name} 
-                type={type} 
-                required={required}
-                defaultValue={defaultValue}
-                value={value}
-                onChange={onChange}
-                disabled={disabled}
-                placeholder={placeholder}
-                className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-indigo-600/20 outline-none transition-all placeholder:text-slate-300 font-bold text-sm shadow-sm"
-            />
-        </div>
-    )
-}
-
-function SelectField({ label, name, children, defaultValue, required = false, value, onChange, disabled }: any) {
-    return (
-        <div className="space-y-2 group">
-            <label className="block text-[10px] font-bold text-slate-400 ml-1 group-focus-within:text-indigo-600 transition-colors">
-                {label} {required && <span className="text-rose-500">*</span>}
-            </label>
-            <div className="relative">
-                <select 
-                    name={name}
-                    required={required}
-                    value={value}
-                    defaultValue={defaultValue}
-                    onChange={onChange}
-                    disabled={disabled}
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-indigo-600/20 outline-none transition-all font-bold text-sm shadow-sm appearance-none cursor-pointer disabled:opacity-50"
-                >
-                    {children}
-                </select>
-                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                    <ChevronDown size={18} />
-                </div>
-            </div>
-        </div>
-    )
+    );
 }

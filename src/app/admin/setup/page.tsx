@@ -20,7 +20,9 @@ import {
   Users,
   MoreVertical,
   Check,
-  Camera
+  Camera,
+  Trash2,
+  X
 } from "lucide-react";
 import { 
   getSchoolDetails, 
@@ -52,10 +54,15 @@ function SetupContent() {
   
   const [activeTab, setActiveTab] = useState(tabParam || 'branches');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<any>(null); // Add state for editing
   const [school, setSchool] = useState<SchoolType | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
+
   const [classes, setClasses] = useState<Class[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  
+  // Sticky state for the form
+  const [lastSelectedBranch, setLastSelectedBranch] = useState<string>("");
 
   useEffect(() => {
     const unsubSchool = subscribeToSchoolDetails(setSchool);
@@ -81,6 +88,7 @@ function SetupContent() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setShowAddForm(false);
+    setEditingProgram(null); // Clear edit state
     router.push(`/admin/setup?tab=${tab}`, { scroll: false });
   };
 
@@ -138,12 +146,34 @@ function SetupContent() {
               <div className="space-y-6">
                   {!hasBranches ? (
                        <SetupRequired message="Please create at least one Branch first." action={() => handleTabChange('branches')} />
-                   ) : showAddForm ? (
+                   ) : (showAddForm || editingProgram) ? (
                        <div className="max-w-3xl mx-auto">
-                           <CreateProgramForm branches={branches} onCancel={() => setShowAddForm(false)} />
+                           <ProgramForm 
+                                branches={branches} 
+                                initialData={editingProgram}
+                                onCancel={() => {
+                                    setShowAddForm(false);
+                                    setEditingProgram(null);
+                                }} 
+                                lastSelectedBranch={lastSelectedBranch}
+                                setLastSelectedBranch={setLastSelectedBranch}
+                           />
                        </div>
                    ) : (
-                       <ProgramList classes={classes} enrollments={enrollments} onAdd={() => setShowAddForm(true)} />
+                       <ProgramList 
+                            classes={classes} 
+                            enrollments={enrollments} 
+                            onAdd={() => setShowAddForm(true)}
+                            onEdit={(program: any) => setEditingProgram(program)}
+                            onDelete={async (id: string) => {
+                                try {
+                                    await programService.delete(id);
+                                } catch (e) {
+                                    console.error(e);
+                                    alert("Failed to delete program");
+                                }
+                            }}
+                       />
                    )}
               </div>
           )}
@@ -251,7 +281,7 @@ function BranchList({ branches, enrollments, onAdd }: any) {
     )
 }
 
-function ProgramList({ classes, enrollments, onAdd }: any) {
+function ProgramList({ classes, enrollments, onAdd, onEdit, onDelete }: any) {
     const [programs, setPrograms] = useState<any[]>([]);
 
     useEffect(() => {
@@ -281,11 +311,31 @@ function ProgramList({ classes, enrollments, onAdd }: any) {
                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                    <GraduationCap size={24} />
                                </div>
-                               <span className="px-3 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-bold">
-                                   ${p.price}
-                               </span>
+                               <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => onEdit(p)}
+                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    >
+                                        <Settings size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            if(confirm('Are you sure you want to delete this program?')) {
+                                                onDelete(p.id);
+                                            }
+                                        }}
+                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                               </div>
                            </div>
-                           <h3 className="text-lg font-bold text-slate-800 mb-1">{p.name}</h3>
+                           <div className="flex justify-between items-center mb-2">
+                                <h3 className="text-lg font-bold text-slate-800">{p.name}</h3>
+                                <span className="px-3 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-bold">
+                                   ${p.price}
+                                </span>
+                           </div>
                            <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
                                <span className="flex items-center gap-1"><Calendar size={12}/> {p.durationSessions} Sessions</span>
                            </div>
@@ -302,7 +352,64 @@ function ProgramList({ classes, enrollments, onAdd }: any) {
     )
 }
 
+function ProgramForm({ branches, initialData, onCancel, lastSelectedBranch, setLastSelectedBranch }: any) {
+    const [submitting, setSubmitting] = useState(false);
 
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        if (submitting) return;
+        setSubmitting(true);
+        try {
+            const data = Object.fromEntries(new FormData(e.currentTarget));
+            
+            // Save sticky branch
+            if (setLastSelectedBranch && data.branchId) {
+                setLastSelectedBranch(data.branchId.toString());
+            }
+
+            if (initialData) {
+                await programService.update(initialData.id, data);
+            } else {
+                await programService.create(data as any);
+            }
+            onCancel();
+        } catch (error) {
+            console.error(error);
+            alert("Failed to save program");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+    
+    return (
+        <CardForm 
+            title={initialData ? "Edit Academic Program" : "New Academic Program"} 
+            onCancel={onCancel} 
+            onSubmit={handleSubmit} 
+            submitLabel={submitting ? (<Loader2 className="animate-spin" />) : (initialData ? "Update" : "Create")}
+        >
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                     <label className="text-xs font-bold text-slate-500 ml-1 uppercase">Branch Name</label>
+                     <select 
+                        name="branchId" 
+                        required 
+                        defaultValue={initialData?.branchId || lastSelectedBranch}
+                        className="w-full px-5 py-4 rounded-xl bg-slate-50 border-2 border-transparent focus:border-blue-500/20 focus:bg-white outline-none font-bold text-slate-700 transition-all"
+                    >
+                         {branches.map((b: any) => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
+                     </select>
+                 </div>
+                 <InputGroup label="Program Name" name="name" required placeholder="e.g. General English" defaultValue={initialData?.name} />
+                 <InputGroup label="Sessions" name="durationSessions" type="number" required defaultValue={initialData?.durationSessions || 24} />
+                 <div className="grid grid-cols-2 gap-4">
+                    <InputGroup label="Tuition Fee ($)" name="price" type="number" required placeholder="Total" defaultValue={initialData?.price} step="0.01" />
+                    <InputGroup label="Session Fee ($)" name="session_fee" type="number" placeholder="Fee per session" defaultValue={initialData?.session_fee} step="0.01" />
+                 </div>
+             </div>
+        </CardForm>
+    )
+}
 
 function SchoolSettingsForm({ school }: any) {
     const [submitting, setSubmitting] = useState(false);
@@ -482,36 +589,17 @@ function CreateBranchForm({ school, onCancel }: any) {
     )
 }
 
-function CreateProgramForm({ branches, onCancel }: any) {
-    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.currentTarget));
-        await programService.create(data as any);
-        onCancel();
-    }
-    
-    return (
-        <CardForm title="New Academic Program" onCancel={onCancel} onSubmit={handleSubmit} submitLabel="Do it">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="space-y-2">
-                     <label className="text-xs font-bold text-slate-500 ml-1 uppercase">Campus</label>
-                     <select name="branchId" required className="w-full px-5 py-4 rounded-xl bg-slate-50 border-2 border-transparent focus:border-blue-500/20 focus:bg-white outline-none font-bold text-slate-700 transition-all">
-                         {branches.map((b: any) => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
-                     </select>
-                 </div>
-                 <InputGroup label="Program Title" name="name" required placeholder="e.g. General English" />
-                 <InputGroup label="Sessions" name="durationSessions" type="number" required defaultValue={24} />
-                 <InputGroup label="Tuition Fee ($)" name="price" type="number" required placeholder="120.00" />
-             </div>
-        </CardForm>
-    )
-}
-
 // --- Generic UI Helpers ---
 
 function CardForm({ title, children, onCancel, onSubmit, submitLabel = "Create" }: any) {
     return (
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 md:p-12 animate-in zoom-in-95 duration-300">
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 md:p-12 animate-in zoom-in-95 duration-300 relative">
+             <button 
+                onClick={onCancel}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+             >
+                <X size={24} />
+             </button>
              <div className="text-center mb-8">
                  <h2 className="text-2xl font-black text-slate-800">{title}</h2>
              </div>
@@ -519,14 +607,14 @@ function CardForm({ title, children, onCancel, onSubmit, submitLabel = "Create" 
                  {children}
                  <div className="flex gap-4 mt-8">
                      <button type="button" onClick={onCancel} className="flex-1 py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50">Cancel</button>
-                     <button className="flex-1 py-4 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200">{submitLabel}</button>
+                     <button type="submit" className="flex-1 py-4 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200">{submitLabel}</button>
                  </div>
              </form>
         </div>
     )
 }
 
-function InputGroup({ label, name, type="text", required, defaultValue, placeholder, icon, className }: any) {
+function InputGroup({ label, name, type="text", required, defaultValue, placeholder, icon, className, ...props }: any) {
     return (
         <div className={`space-y-2 ${className}`}>
             <label className="flex items-center gap-2 text-xs font-bold text-slate-400 ml-1 uppercase tracking-wide">
@@ -544,6 +632,7 @@ function InputGroup({ label, name, type="text", required, defaultValue, placehol
                     required={required}
                     defaultValue={defaultValue}
                     placeholder={placeholder}
+                    step={props.step}
                     className={`w-full ${icon ? 'pl-14 pr-5' : 'px-5'} py-4 rounded-xl bg-slate-50 border-2 border-slate-100 focus:border-blue-500/20 focus:bg-white outline-none font-bold text-slate-700 placeholder:text-slate-300 transition-all shadow-sm`}
                 />
             </div>

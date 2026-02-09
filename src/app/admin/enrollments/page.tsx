@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   Plus, 
   Trash2, 
@@ -12,13 +12,16 @@ import {
   CreditCard,
   X,
   Check,
-  Loader2, LayoutGrid, LayoutList, Building2, Globe, Phone, MapPin, School, ArrowLeft, User, Wallet, Landmark, Calendar, CalendarCheck 
+  Pencil,
+  Loader2, LayoutGrid, LayoutList, Building2, Globe, Phone, MapPin, School, ArrowLeft, ArrowRight, User, Wallet, Landmark, Calendar, CalendarCheck, ChevronDown, Printer
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Student, Class, Enrollment, Branch } from "@/lib/types";
-import { subscribeToStudents, subscribeToClasses, subscribeToEnrollments, addEnrollment, deleteEnrollment } from "@/lib/services/schoolService";
+import { subscribeToStudents, subscribeToClasses, subscribeToEnrollments, addEnrollment, deleteEnrollment, updateClass, deleteClass } from "@/lib/services/schoolService";
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
+import { termService } from "@/services/termService";
+import { Term } from "@/lib/types";
 
 /* =========================
    TYPES & HELPERS
@@ -26,8 +29,12 @@ import { programService } from "@/services/programService";
 
 // Helper to calculate progress/payment status
 const getPaymentStatus = (paid: number, total: number, discount: number = 0) => {
+  // If total is 0 (skipped payment details), status is Unpaid
+  if (!total || total === 0) return 'Unpaid';
+
   const finalTotal = Math.max(0, total - discount);
-  if (finalTotal === 0) return 'Paid'; 
+  if (finalTotal === 0) return 'Paid'; // Fully discounted
+  
   const percentage = (paid / finalTotal) * 100;
   return percentage >= 100 ? 'Paid' : 'Unpaid';
 };
@@ -36,7 +43,7 @@ const getPaymentStatus = (paid: number, total: number, discount: number = 0) => 
    COMPONENTS
    ========================= */
 
-function ClassCard({ cls, enrollments, onClick }: { cls: Class, enrollments: Enrollment[], onClick: () => void }) {
+function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: { cls: Class, enrollments: Enrollment[], onClick: () => void, onEdit: () => void, onDelete: () => void, branchName: string }) {
   const router = useRouter();
   const activeEnrollments = enrollments.filter(e => e.class_id === cls.class_id);
   const count = activeEnrollments.length;
@@ -54,21 +61,37 @@ function ClassCard({ cls, enrollments, onClick }: { cls: Class, enrollments: Enr
        
        <div className="flex justify-between items-start mb-6">
           <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white flex-shrink-0">
                   <div className="bg-white/20 p-2 rounded-full">
                      <Users size={20} />
                   </div>
               </div>
-              <div>
-                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">{cls.className}</h3>
-                  <div className="flex items-center gap-2 mt-1.5 text-xs font-semibold text-slate-400">
-                     <Calendar size={12} />
-                     <span className="truncate max-w-[120px]">{Array.isArray(cls.days) ? cls.days.join(" • ") : cls.days}</span>
+              <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1 break-words">{cls.className}</h3>
+              <div className="flex flex-col gap-1.5 mt-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                     <Calendar size={12} className="flex-shrink-0 text-slate-400" />
+                     <span className="truncate">{Array.isArray(cls.days) ? cls.days.join(" • ") : cls.days}</span>
+                  </div>
+                  {(cls.startTime && cls.endTime) && (
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                         <Clock size={12} className="flex-shrink-0 text-slate-400" />
+                         <span className="truncate">{cls.startTime} - {cls.endTime}</span>
+                      </div>
+                  )}
+                  {/* Branch Name Display */}
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full w-fit">
+                     <Building2 size={10} className="flex-shrink-0" />
+                     <span className="truncate">{branchName}</span>
                   </div>
               </div>
           </div>
-          <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${isFull ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-             {isFull ? 'FULL' : 'OPEN'}
+      </div>
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
+             <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${isFull ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                {isFull ? 'FULL' : 'OPEN'}
+             </div>
           </div>
        </div>
 
@@ -104,7 +127,21 @@ function ClassCard({ cls, enrollments, onClick }: { cls: Class, enrollments: Enr
                  )}
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                    title="Edit Class"
+                >
+                    <Pencil size={14} />
+                </button>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                    title="Delete Class"
+                >
+                    <Trash2 size={14} />
+                </button>
                 <button 
                     onClick={handleViewAttendance}
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
@@ -112,9 +149,6 @@ function ClassCard({ cls, enrollments, onClick }: { cls: Class, enrollments: Enr
                 >
                     <CalendarCheck size={14} />
                 </button>
-                <span className="text-[10px] font-bold text-indigo-500 group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                    View Class <ChevronRight size={12} />
-                </span>
               </div>
           </div>
        </div>
@@ -122,14 +156,19 @@ function ClassCard({ cls, enrollments, onClick }: { cls: Class, enrollments: Enr
   );
 }
 
-function EnrollmentCard({ enrollment, onRemove }: { enrollment: Enrollment; onRemove: () => void }) {
+function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: Enrollment; onRemove: () => void; onViewInvoice: () => void }) {
   const student = enrollment.student;
-  const isPaid = getPaymentStatus(enrollment.paid_amount || 0, enrollment.total_amount || 0, enrollment.discount || 0) === 'Paid';
+  const isPaidAmount = getPaymentStatus(enrollment.paid_amount || 0, enrollment.total_amount || 0, enrollment.discount || 0) === 'Paid';
+  // const isExpired = enrollment.payment_due_date && new Date() > new Date(enrollment.payment_due_date);
+  
+  // If expired, show as Unpaid/Expired. Prefer explicit payment_status if set to 'Unpaid' but override if Paid.
+  const status = (enrollment.payment_status === 'Paid' || isPaidAmount) ? 'Paid' : 'Unpaid';
+  const statusColor = status === 'Paid' ? 'emerald' : 'rose';
 
   if (!student) return null;
 
   return (
-    <div className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-100 hover:shadow-md transition-all gap-4">
+    <div className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-100 hover:shadow-md transition-all gap-4`}>
        <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold shadow-sm overflow-hidden flex-shrink-0">
              {student.image_url ? (
@@ -156,21 +195,35 @@ function EnrollmentCard({ enrollment, onRemove }: { enrollment: Enrollment; onRe
              </div>
              <div>
                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Paid</p>
-                 <p className={`font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>${enrollment.paid_amount?.toLocaleString() || '0'}</p>
+                 <p className={`font-bold ${isPaidAmount ? 'text-emerald-600' : 'text-amber-600'}`}>${enrollment.paid_amount?.toLocaleString() || '0'}</p>
              </div>
              <div className="hidden sm:block">
                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                 <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mt-0.5 ${isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                    {isPaid ? 'Paid' : 'Unpaid'}
+                 <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mt-0.5 bg-${statusColor}-50 text-${statusColor}-600 border-${statusColor}-100`}>
+                    {status}
                  </div>
-             </div>
-          </div>
+                  {/* {isExpired && <p className="text-[9px] text-rose-500 font-bold mt-0.5">Overdue</p>} */}
+                 {(enrollment.payment_due_date || enrollment.payment_expired) && (
+                     <p className="text-[9px] text-slate-400 font-medium mt-0.5 whitespace-nowrap">
+                        Due: {new Date(enrollment.payment_due_date || enrollment.payment_expired || '').toLocaleDateString()}
+                     </p>
+                  )}
+              </div>
+           </div>
           
           <button 
              onClick={(e) => { e.stopPropagation(); onRemove(); }}
              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
           >
              <Trash2 size={16} />
+          </button>
+          
+          <button 
+             onClick={(e) => { e.stopPropagation(); onViewInvoice(); }}
+             className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all opacity-0 group-hover:opacity-100"
+             title="View Invoice"
+          >
+             <Printer size={16} />
           </button>
        </div>
     </div>
@@ -208,10 +261,13 @@ function Select({ label, children, ...props }: { label: string, children: React.
 ========================= */
 
 export default function EnrollmentsPage() {
-  // Global State
+  // Global State (HMR Trigger)
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [terms, setTerms] = useState<Term[]>([]);
   const [loading, setLoading] = useState(true);
 
   // UI State
@@ -219,15 +275,105 @@ export default function EnrollmentsPage() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddClassModal, setShowAddClassModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [showRolloverModal, setShowRolloverModal] = useState(false);
+  const [rolloverStudentIds, setRolloverStudentIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+  const [viewInvoiceEnrollment, setViewInvoiceEnrollment] = useState<Enrollment | null>(null);
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
+
+  // Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterBranch, setFilterBranch] = useState("");
+  const [filterProgram, setFilterProgram] = useState("");
+  const [filterTerm, setFilterTerm] = useState("");
+  const [filterDay, setFilterDay] = useState("");
 
   // Custom Dropdown State
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]); // Multi-select
   const [studentDropdownOpen, setStudentDropdownOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState(""); // Internal search for dropdown
+  const studentInputRef = useRef<HTMLInputElement>(null);
 
-  // Data Loading
+  // Individual Payment State
+  const [studentPayments, setStudentPayments] = useState<Record<string, { 
+      total_amount: number, 
+      discount: number, 
+      paid_amount: number, 
+      payment_type: string, 
+      payment_expired: string,
+      start_session: number,
+      include_next_term: boolean
+  }>>({});
+
+  // Helper to get program price
+  const getProgramPrice = useMemo(() => {
+      if (!selectedClass || !selectedClass.programId) return 0;
+      const program = programs.find((p: any) => p.id === selectedClass.programId); 
+      return Number(program?.price || 0);
+  }, [selectedClass, programs]);
+
+  // Helper to calculate fees dynamically
+  const calculateFees = useCallback((startSession: number, includeNextTerm: boolean) => {
+      if (!selectedClass) return 0;
+      
+      const program = programs.find((p: any) => p.id === selectedClass.programId);
+      const totalSessions = selectedClass.totalSessions || 1; 
+      
+      // Use fee from program if available (User Request)
+      let pricePerSession = 0;
+      if (program?.session_fee) {
+          pricePerSession = Number(program.session_fee);
+      } else if (program?.pricePerSession) {
+           pricePerSession = Number(program.pricePerSession);
+      } else {
+          const price = Number(program?.price || 0);
+          pricePerSession = price / totalSessions;
+      }
+      
+      const remainingSessions = Math.max(0, totalSessions - startSession + 1);
+      const currentTermFee = remainingSessions * pricePerSession;
+      
+      const nextTermFee = includeNextTerm ? Number(program?.price || 0) : 0;
+      
+      return Math.ceil(currentTermFee + nextTermFee); 
+  }, [selectedClass, programs]);
+
+  // Update payment details when students are selected
+  useEffect(() => {
+      setStudentPayments(prev => {
+          const newPayments = { ...prev };
+          
+          // Remove payments for deselected students
+          Object.keys(newPayments).forEach(id => {
+              if (!selectedStudentIds.includes(id)) {
+                  delete newPayments[id];
+              }
+          });
+
+          // Add default payment for new students
+          selectedStudentIds.forEach(id => {
+              if (!newPayments[id]) {
+                  const defaultStartSession = 1;
+                  const defaultIncludeNextTerm = false;
+
+                  newPayments[id] = {
+                      total_amount: calculateFees(defaultStartSession, defaultIncludeNextTerm),
+                      discount: 0,
+                      paid_amount: 0,
+                      payment_type: 'Cash',
+                      payment_expired: '',
+                      start_session: defaultStartSession,
+                      include_next_term: defaultIncludeNextTerm
+                  };
+              }
+          });
+          
+          return newPayments;
+      });
+  }, [selectedStudentIds, calculateFees]);
+
   useEffect(() => {
     const unsubStudents = subscribeToStudents(setStudents);
     const unsubClasses = subscribeToClasses(setClasses);
@@ -235,33 +381,127 @@ export default function EnrollmentsPage() {
         setEnrollments(data);
         setLoading(false);
     });
-    return () => { unsubStudents(); unsubClasses(); unsubEnrollments(); };
+    const unsubBranches = branchService.subscribe(setBranches);
+    const unsubPrograms = programService.subscribe(setPrograms);
+    const unsubTerms = termService.subscribe(setTerms);
+
+    return () => { 
+        unsubStudents(); 
+        unsubClasses(); 
+        unsubEnrollments(); 
+        unsubBranches();
+        unsubPrograms();
+        unsubTerms();
+    };
   }, []);
 
   // Filtered Classes for Grid
   const filteredClasses = useMemo(() => {
-    if (!searchQuery) return classes;
-    const q = searchQuery.toLowerCase();
-    return classes.filter(c => c.className.toLowerCase().includes(q));
-  }, [classes, searchQuery]);
+    let result = classes;
+
+    // Search
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(c => c.className.toLowerCase().includes(q));
+    }
+
+    // Filter Branch
+    if (filterBranch) {
+        result = result.filter(c => c.branchId === filterBranch);
+    }
+
+    // Filter Program
+    if (filterProgram) {
+        result = result.filter(c => c.programId === filterProgram);
+    }
+
+    // Filter Day
+    if (filterDay) {
+        result = result.filter(c => {
+            const days: any = c.days;
+            if (Array.isArray(days)) {
+                return days.some((d: string) => d.toLowerCase() === filterDay.toLowerCase());
+            }
+            if (typeof days === 'string') {
+                 return days.toLowerCase() === filterDay.toLowerCase();
+            }
+            return false;
+        });
+    }
+
+    return result;
+  }, [classes, searchQuery, filterBranch, filterProgram]);
+
+  // Get the active term for default display
+  const activeTerm = useMemo(() => terms.find(t => t.status === 'Active'), [terms]);
+  
+  // Use filterTerm if set, otherwise default to active term
+  const displayTermId = filterTerm || activeTerm?.term_id || '';
+  const displayTermName = terms.find(t => t.term_id === displayTermId)?.term_name || '';
+
+  // Filter enrollments by term (Active or Selected) for Class Card counts
+  const termEnrollments = useMemo(() => {
+     if (filterTerm) {
+         return enrollments.filter(e => e.term_id === filterTerm);
+     }
+     if (activeTerm) {
+         return enrollments.filter(e => e.term_id === activeTerm.term_id || e.term === activeTerm.term_name);
+     }
+     return enrollments;
+  }, [enrollments, filterTerm, activeTerm]);
 
   const classRoster = useMemo(() => {
     if (!selectedClass) return [];
-    return enrollments
+    
+    // Get all enrollments for this class in the selected/active term
+    const classEnrollments = enrollments
         .filter(e => e.class_id === selectedClass.class_id)
+        .filter(e => {
+            // Match by term_id OR legacy term name
+            if (!displayTermId) return true;
+            return e.term_id === displayTermId || e.term === displayTermName;
+        })
+        .filter(e => e.enrollment_status === 'Active' || e.enrollment_status === 'Hold') // Active and Hold students
         .map(e => ({ ...e, student: students.find(s => s.student_id === e.student_id) }))
         .filter(e => e.student); // Ensure student exists
-  }, [selectedClass, enrollments, students]);
+    
+    // Group by student_id to avoid duplicates
+    const uniqueByStudent = new Map<string, typeof classEnrollments[0]>();
+    classEnrollments.forEach(enrollment => {
+        const key = enrollment.student_id;
+        if (!uniqueByStudent.has(key)) {
+            uniqueByStudent.set(key, enrollment);
+        }
+    });
+    
+    return Array.from(uniqueByStudent.values());
+  }, [selectedClass, enrollments, students, displayTermId, displayTermName]);
 
   // Filter students for dropdown
   const availableStudents = useMemo(() => {
+    // console.log("availableStudents Check:", { selectedClass: selectedClass?.className, totalStudents: students.length, query: studentSearchQuery });
+    if (!selectedClass) return [];
+
+    // Get IDs of students already enrolled in this class/term (Active, Hold, Completed)
+    // We exclude 'Dropped' so they can be re-enrolled if needed
+    const enrolledStudentIds = enrollments
+        .filter(e => 
+            e.class_id === selectedClass.class_id &&
+            // Check term matching
+            (displayTermId ? (e.term_id === displayTermId || e.term === displayTermName) : true) &&
+            // Filter out dropped students (they should appear in dropdown)
+            e.enrollment_status !== 'Dropped'
+        )
+        .map(e => e.student_id);
+
     // Exclude already enrolled students
-    const unenrolled = students.filter(s => !classRoster.some(r => r.student?.student_id === s.student_id));
+    const unenrolled = students.filter(s => !enrolledStudentIds.includes(s.student_id));
+    
     if (!studentSearchQuery) return unenrolled;
     const q = studentSearchQuery.toLowerCase();
     // Search by name (first name included) or code
     return unenrolled.filter(s => s.student_name.toLowerCase().includes(q) || s.student_code.toLowerCase().includes(q));
-  }, [students, classRoster, studentSearchQuery]);
+  }, [students, enrollments, selectedClass, displayTermId, displayTermName, studentSearchQuery]);
 
   const toggleStudent = (id: string) => {
       setSelectedStudentIds(prev => 
@@ -278,21 +518,32 @@ export default function EnrollmentsPage() {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData);
         
+        // Use selected term from filter, or find the current active term
+        const selectedTermId = filterTerm || terms.find(t => t.status === 'Active')?.term_id || '';
+        const selectedTermName = terms.find(t => t.term_id === selectedTermId)?.term_name || '';
+        
         // Loop through all selected students and enroll them
-        const enrollPromises = selectedStudentIds.map(studentId => 
-            addEnrollment({
+        // Loop through all selected students and enroll them
+        const enrollPromises = selectedStudentIds.map(studentId => {
+            const payment = studentPayments[studentId] || { 
+                total_amount: 0, discount: 0, paid_amount: 0, payment_type: 'Cash', payment_expired: '' 
+            };
+            
+            return addEnrollment({
                 class_id: selectedClass.class_id,
                 student_id: studentId,
                 start_session: Number(data.start_session) || 1,
-                total_amount: Number(data.total_amount) || 0,
-                discount: Number(data.discount) || 0,
-                paid_amount: Number(data.paid_amount) || 0,
-                payment_status: (Number(data.paid_amount) >= (Number(data.total_amount) - Number(data.discount))) ? 'Paid' : 'Unpaid' as any,
-                payment_type: data.payment_type as any || 'Cash',
-                payment_expired: data.payment_expired as string,
-                payment_date: new Date().toISOString()
-            })
-        );
+                total_amount: Number(payment.total_amount) || 0,
+                discount: Number(payment.discount) || 0,
+                paid_amount: Number(payment.paid_amount) || 0,
+                payment_status: getPaymentStatus(Number(payment.paid_amount), Number(payment.total_amount), Number(payment.discount)) as any,
+                payment_type: payment.payment_type as any || 'Cash',
+                payment_due_date: payment.payment_expired as string,
+                payment_date: new Date().toISOString(),
+                term_id: selectedTermId,
+                term: selectedTermName
+            });
+        });
 
         await Promise.all(enrollPromises);
         
@@ -315,32 +566,123 @@ export default function EnrollmentsPage() {
     }
   }
 
+  // Rollover students from inactive term to active term
+  async function handleRollover() {
+    if (!selectedClass || !activeTerm || rolloverStudentIds.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+        // Create new enrollments for selected students in the active term
+        const enrollPromises = rolloverStudentIds.map(studentId => {
+            // Find the original enrollment from the old term
+            const oldEnrollment = classRoster.find(r => r.student_id === studentId);
+            
+            return addEnrollment({
+                class_id: selectedClass.class_id,
+                student_id: studentId,
+                start_session: 1, // Start fresh in new term
+                total_amount: oldEnrollment?.total_amount || 0,
+                discount: oldEnrollment?.discount || 0,
+                paid_amount: 0, // Reset payment for new term
+                payment_status: 'Unpaid' as any,
+                payment_type: oldEnrollment?.payment_type || 'Cash' as any,
+                payment_due_date: '', // Reset for new term
+                payment_date: new Date().toISOString(),
+                term_id: activeTerm.term_id,
+                term: activeTerm.term_name
+            });
+        });
+
+        await Promise.all(enrollPromises);
+        
+        setShowRolloverModal(false);
+        setRolloverStudentIds([]);
+        setFilterTerm(""); // Switch to active term view
+        alert(`Successfully enrolled ${enrollPromises.length} students in ${activeTerm.term_name}!`);
+    } catch (err) {
+        alert("Failed to rollover students.");
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteClass(classId: string) {
+      if (!confirm("Are you sure you want to delete this class? This action cannot be undone and will delete all associated enrollments.")) return;
+      try {
+          await deleteClass(classId);
+      } catch (err) {
+          alert("Failed to delete class.");
+      }
+  }
+
   if (loading) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>;
   }
 
   /* RENDER: CLASS DETAIL VIEW */
   if (selectedClass) {
+    // Check if viewing an inactive term (for rollover)
+    const isViewingInactiveTerm = filterTerm && terms.find(t => t.term_id === filterTerm)?.status === 'Inactive';
+    const canRollover = isViewingInactiveTerm && activeTerm && classRoster.length > 0;
+    
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setSelectedClass(null)} className="w-10 h-10 rounded-xl border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-white transition-all">
+                    <button onClick={() => { setSelectedClass(null); setFilterTerm(""); }} className="w-10 h-10 rounded-xl border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-white transition-all">
                         <ArrowLeft size={20} />
                     </button>
                     <div>
                         <h1 className="text-2xl font-black text-slate-900 tracking-tight">{selectedClass.className}</h1>
-                        <p className="text-slate-400 font-bold text-xs mt-1">Class Roster & Enrollment</p>
+                        <p className="text-slate-400 font-bold text-xs mt-1">
+                            {displayTermName ? `${displayTermName} Roster` : 'Class Roster'}
+                        </p>
                     </div>
                 </div>
-                <button 
-                  onClick={() => setShowAddModal(true)}
-                  className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
-                >
-                    <Plus size={16} />
-                    <span>Add Student</span>
-                </button>
+                <div className="flex items-center gap-3">
+                    {/* Term Filter */}
+                    <div className="relative">
+                        <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                            value={filterTerm}
+                            onChange={(e) => setFilterTerm(e.target.value)}
+                            className="pl-9 pr-4 py-2.5 rounded-xl border-2 border-slate-100 bg-white text-slate-700 font-semibold text-xs focus:border-indigo-200 outline-none transition-all min-w-[180px]"
+                        >
+                            <option value="">Current Term ({activeTerm?.term_name || 'None'})</option>
+                            {terms
+                                .filter(t => t.term_id !== activeTerm?.term_id)
+                                .map(t => (
+                                <option key={t.term_id} value={t.term_id}>{t.term_name} ({t.status})</option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {/* Rollover Button - only show when viewing inactive term */}
+                    {canRollover && (
+                        <button 
+                            onClick={() => {
+                                setRolloverStudentIds(classRoster.map(r => r.student_id));
+                                setShowRolloverModal(true);
+                            }}
+                            className="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-xs hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 flex items-center gap-2"
+                        >
+                            <ArrowRight size={16} />
+                            <span>Rollover to {activeTerm?.term_name}</span>
+                        </button>
+                    )}
+                    
+                    {/* Add Student - only when viewing active term */}
+                    {!filterTerm && (
+                        <button 
+                            onClick={() => setShowAddModal(true)}
+                            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                        >
+                            <Plus size={16} />
+                            <span>Add Student</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -365,7 +707,12 @@ export default function EnrollmentsPage() {
                     </div>
                 ) : (
                     classRoster.map(enrollment => (
-                        <EnrollmentCard key={enrollment.enrollment_id} enrollment={enrollment} onRemove={() => handleRemoveStudent(enrollment.enrollment_id!)} />
+                        <EnrollmentCard 
+                            key={enrollment.enrollment_id} 
+                            enrollment={enrollment} 
+                            onRemove={() => handleRemoveStudent(enrollment.enrollment_id!)} 
+                            onViewInvoice={() => setViewInvoiceEnrollment(enrollment)}
+                        />
                     ))
                 )}
             </div>
@@ -378,221 +725,595 @@ export default function EnrollmentsPage() {
                 >
                     <div 
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+                        className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
                     >
                         <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
-                            <h2 className="text-lg font-bold text-slate-900">Enroll Student</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900">Enroll Students</h2>
+                                <p className="text-xs font-bold text-slate-400 mt-1">Select students and configure payment</p>
+                            </div>
+                            <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                         </div>
-                        <form onSubmit={handleAddStudent} className="p-8 space-y-6 overflow-y-auto">
-                             {/* CUSTOM STUDENT SELECT WITH MULTI-SELECT & SEARCH */}
-                            <div className="space-y-1.5 group">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Select Students</label>
-                                <div className="relative">
-                                    <button 
-                                      type="button" 
-                                      onClick={() => setStudentDropdownOpen(!studentDropdownOpen)}
-                                      className="w-full px-4 py-3 text-left rounded-xl bg-slate-50 border-2 border-slate-100 hover:border-indigo-200 hover:bg-white transition-all flex items-center justify-between"
-                                    >
-                                        {selectedStudentIds.length > 0 ? (
-                                            <span className="font-bold text-slate-700">
-                                                {selectedStudentIds.length} Student{selectedStudentIds.length > 1 ? 's' : ''} Selected
-                                            </span>
-                                        ) : <span className="text-slate-400 font-bold text-sm">Choose students...</span>}
-                                        <ChevronRight size={16} className={`text-slate-400 transition-transform ${studentDropdownOpen ? 'rotate-90' : ''}`} />
-                                    </button>
-                                    
-                                    {studentDropdownOpen && (
-                                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-80 overflow-hidden z-20 flex flex-col">
-                                            {/* Search Input */}
-                                            <div className="p-3 border-b border-slate-50 relative">
-                                                <input 
-                                                    autoFocus
-                                                    value={studentSearchQuery}
-                                                    onChange={(e) => setStudentSearchQuery(e.target.value)}
-                                                    placeholder="Search by first name..." 
-                                                    className="w-full px-3 py-2 bg-slate-50 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
-                                                />
-                                            </div>
-
-                                            {/* List */}
-                                            <div className="overflow-y-auto max-h-60 p-1">
-                                                {availableStudents.length === 0 ? (
-                                                    <div className="p-4 text-center text-xs text-slate-400 font-bold">No students found</div>
-                                                ) : (
-                                                    availableStudents.map((s, index) => {
-                                                        const isSelected = selectedStudentIds.includes(s.student_id);
-                                                        return (
-                                                            <button
-                                                                key={`${s.student_id}-${index}`}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    toggleStudent(s.student_id);
-                                                                    setStudentDropdownOpen(false); // Auto-close as requested
-                                                                }}
-                                                                className={`w-full px-3 py-2 text-left rounded-lg flex items-center gap-3 transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
-                                                            >
-                                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
-                                                                    {isSelected && <Check size={12} className="text-white" />}
-                                                                </div>
-                                                                
-                                                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                                                                        {s.image_url ? <img src={s.image_url} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-slate-500">{s.student_name.charAt(0)}</span>}
-                                                                    </div>
-                                                                    <div className="truncate">
-                                                                        <p className="font-bold text-slate-800 text-xs truncate">{s.student_name}</p>
-                                                                        <p className="text-[10px] text-slate-400 font-medium truncate">{s.student_code}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })
+                        
+                        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                            {/* LEFT: STUDENT SELECTION GRID */}
+                            <div className="flex-1 flex flex-col border-r border-slate-100 min-w-[300px] bg-slate-50/30">
+                                <div className="p-4 border-b border-slate-100 bg-white">
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search students..." 
+                                            value={studentSearchQuery}
+                                            onChange={(e) => setStudentSearchQuery(e.target.value)}
+                                            className="w-full pl-4 pr-10 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                                        />
+                                        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    </div>
+                                    <div className="mt-3 flex justify-between items-center px-1">
+                                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{availableStudents.length} Students Available</span>
+                                       <span className="text-xs font-bold text-indigo-600">{selectedStudentIds.length} Selected</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 lg:grid-cols-2 gap-3 content-start">
+                                    {availableStudents.map(student => {
+                                        const isSelected = selectedStudentIds.includes(student.student_id);
+                                        return (
+                                            <div 
+                                                key={student.student_id}
+                                                onClick={() => toggleStudent(student.student_id)}
+                                                className={`relative p-3 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-3 ${isSelected ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/10' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-black overflow-hidden ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                    {student.image_url ? (
+                                                        <img src={student.image_url} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        student.student_name.charAt(0)
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className={`font-bold text-sm truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{student.student_name}</p>
+                                                    <p className={`text-[10px] font-bold truncate ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`}>{student.student_code}</p>
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-white shadow-sm">
+                                                        <Check size={12} strokeWidth={3} />
+                                                    </div>
                                                 )}
                                             </div>
-                                            
-                                            {/* Footer Count */}
-                                            <div className="p-2 border-t border-slate-50 text-[10px] text-center font-bold text-slate-400 bg-slate-50/50">
-                                                {selectedStudentIds.length} selected
-                                            </div>
+                                        )
+                                    })}
+                                    {availableStudents.length === 0 && (
+                                        <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-300">
+                                            <Search size={32} className="mb-2 opacity-50" />
+                                            <p className="font-bold text-sm">No students found</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* SELECTED STUDENTS DISPLAY */}
-                            {selectedStudentIds.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2 p-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                                    {students
-                                        .filter(s => selectedStudentIds.includes(s.student_id))
-                                        .map(student => (
-                                            <div key={student.student_id} className="flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-xl pr-3 pl-2 py-2 animate-in zoom-in-95 duration-200 group/chip hover:border-indigo-200 transition-colors">
-                                                {/* Avatar */}
-                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-xs font-black text-indigo-600 overflow-hidden border border-indigo-100 group-hover/chip:scale-105 transition-transform">
-                                                    {student.image_url ? <img src={student.image_url} className="w-full h-full object-cover" /> : student.student_name.charAt(0)}
-                                                </div>
-                                                {/* Info */}
-                                                <div className="flex flex-col min-w-[80px] max-w-[140px]">
-                                                    <span className="text-[11px] font-black text-slate-700 leading-tight truncate px-1">{student.student_name}</span>
-                                                    <span className="text-[9px] font-bold text-slate-400 leading-tight truncate px-1">{student.student_code}</span>
-                                                </div>
-                                                {/* Remove */}
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => toggleStudent(student.student_id)}
-                                                    className="ml-1 w-6 h-6 flex items-center justify-center rounded-full hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all hover:scale-110"
-                                                >
-                                                    <X size={14} />
-                                                </button>
+                            {/* RIGHT: CONFIGURATION & PAYMENT */}
+                            <form onSubmit={handleAddStudent} className="flex-1 flex flex-col bg-white w-full md:w-[450px] lg:w-[500px] flex-shrink-0">
+                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                    
+                                    {/* TERM & SESSION */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Term</label>
+                                            <div className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-700 font-bold text-sm truncate">
+                                                {terms.find(t => t.status === 'Active')?.term_name || 'No Active Term'}
                                             </div>
-                                        ))
-                                    }
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Batch Start Session</label>
+                                            <input 
+                                                type="number" 
+                                                min={1} 
+                                                max={selectedClass?.totalSessions || 100}
+                                                defaultValue={1}
+                                                onChange={(e) => {
+                                                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                    setStudentPayments(prev => {
+                                                        const next = { ...prev };
+                                                        Object.keys(next).forEach(k => {
+                                                            next[k].start_session = val;
+                                                            next[k].total_amount = calculateFees(val, next[k].include_next_term);
+                                                        });
+                                                        return next;
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* BATCH PAYMENT SETTINGS */}
+                                    <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-4">
+                                         <div className="flex items-center justify-between">
+                                            <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2">
+                                                <Wallet size={14} className="text-indigo-600" />
+                                                Batch Payment Settings
+                                            </h3>
+                                            <span className="text-[10px] font-bold text-indigo-400 bg-white px-2 py-0.5 rounded-full">Applies to all selected</span>
+                                         </div>
+                                         
+                                         <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Total</label>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="Total" 
+                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        setStudentPayments(prev => {
+                                                            const next = { ...prev };
+                                                            Object.keys(next).forEach(k => next[k].total_amount = val);
+                                                            return next;
+                                                        })
+                                                    }}
+                                                    value={Object.values(studentPayments)[0]?.total_amount || 0}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Discount</label>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="Discount" 
+                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        setStudentPayments(prev => {
+                                                            const next = { ...prev };
+                                                            Object.keys(next).forEach(k => next[k].discount = val);
+                                                            return next;
+                                                        })
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Paid</label>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="Paid Amount" 
+                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        setStudentPayments(prev => {
+                                                            const next = { ...prev };
+                                                            Object.keys(next).forEach(k => next[k].paid_amount = val);
+                                                            return next;
+                                                        })
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Type</label>
+                                                <select 
+                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setStudentPayments(prev => {
+                                                            const next = { ...prev };
+                                                            Object.keys(next).forEach(k => next[k].payment_type = val);
+                                                            return next;
+                                                        })
+                                                    }}
+                                                >
+                                                    <option value="Cash">Cash</option>
+                                                    <option value="ABA">ABA PayWay</option>
+                                                </select>
+                                            </div>
+                                         </div>
+                                         
+                                         {/* Batch Include Next Term */}
+                                         <div className="flex items-center gap-3 pt-2 border-t border-indigo-100/50">
+                                            <input 
+                                                type="checkbox" 
+                                                id="batch_next_term"
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setStudentPayments(prev => {
+                                                        const next = { ...prev };
+                                                        Object.keys(next).forEach(k => {
+                                                            next[k].include_next_term = checked;
+                                                            next[k].total_amount = calculateFees(next[k].start_session, checked);
+                                                        });
+                                                        return next;
+                                                    });
+                                                }}
+                                            />
+                                            <label htmlFor="batch_next_term" className="text-xs font-bold text-indigo-900 cursor-pointer select-none">
+                                                Include Next Term's Fee (+${getProgramPrice})
+                                            </label>
+                                         </div>
+                                    </div>
+
+                                    {/* SELECTED STUDENTS LIST (Individual Overrides) */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center justify-between">
+                                            <span>Selected Students ({selectedStudentIds.length})</span>
+                                            {selectedStudentIds.length > 0 && <span className="text-[10px] text-slate-400 normal-case">Expand to override</span>}
+                                        </h3>
+                                        
+                                        {selectedStudentIds.length === 0 ? (
+                                            <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                                                <p className="text-slate-400 font-bold text-sm">No students selected</p>
+                                                <p className="text-xs text-slate-300 mt-1">Select students from the list to configure</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {selectedStudentIds.map((studentId) => {
+                                                    const student = students.find(s => s.student_id === studentId);
+                                                    const payment = studentPayments[studentId] || { 
+                                                        total_amount: 0, discount: 0, paid_amount: 0, payment_type: 'Cash', payment_expired: '',
+                                                        start_session: 1, include_next_term: false
+                                                    };
+                                                    
+                                                    const updatePayment = (field: keyof typeof payment, value: any) => {
+                                                        setStudentPayments(prev => {
+                                                            const newState = {
+                                                                ...prev,
+                                                                [studentId]: { ...prev[studentId], [field]: value }
+                                                            };
+                                                            
+                                                            // Auto-recalculate total if start_session or include_next_term changes
+                                                            if (field === 'start_session' || field === 'include_next_term') {
+                                                                const sSession = field === 'start_session' ? value : payment.start_session;
+                                                                const incNext = field === 'include_next_term' ? value : payment.include_next_term;
+                                                                newState[studentId].total_amount = calculateFees(Number(sSession), Boolean(incNext));
+                                                            }
+                                                            
+                                                            return newState;
+                                                        });
+                                                    };
+
+                                                    return (
+                                                        <div key={studentId} className="group p-3 bg-white border border-slate-100 rounded-xl hover:shadow-sm hover:border-indigo-100 transition-all">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                                        {student?.student_name.charAt(0)}
+                                                                    </div>
+                                                                    <p className="font-bold text-sm text-slate-900">{student?.student_name}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {(() => {
+                                                                        const status = getPaymentStatus(payment.paid_amount, payment.total_amount, payment.discount);
+                                                                        return (
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                                                status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                                                                            }`}>
+                                                                                {status}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                    <button type="button" onClick={() => toggleStudent(studentId)} className="text-slate-300 hover:text-rose-500">
+                                                                        <X size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-4 gap-2 mb-2">
+                                                                <div className="col-span-1">
+                                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Start</label>
+                                                                    <input 
+                                                                        type="number" 
+                                                                        value={payment.start_session} 
+                                                                        max={selectedClass?.totalSessions || 100}
+                                                                        min={1}
+                                                                        onChange={e => updatePayment('start_session', parseInt(e.target.value) || 1)}
+                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-1">
+                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Total</label>
+                                                                     <input 
+                                                                        type="number" 
+                                                                        value={payment.total_amount} 
+                                                                        onChange={e => updatePayment('total_amount', parseFloat(e.target.value))}
+                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-1">
+                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Disc</label>
+                                                                     <input 
+                                                                        type="number" 
+                                                                        value={payment.discount} 
+                                                                        onChange={e => updatePayment('discount', parseFloat(e.target.value))}
+                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-1">
+                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Paid</label>
+                                                                     <input 
+                                                                        type="number" 
+                                                                        value={payment.paid_amount} 
+                                                                        onChange={e => updatePayment('paid_amount', parseFloat(e.target.value))}
+                                                                        className={`w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold ${payment.paid_amount > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-slate-700'}`}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    id={`next_term_${studentId}`}
+                                                                    checked={payment.include_next_term}
+                                                                    onChange={e => updatePayment('include_next_term', e.target.checked)}
+                                                                    className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                                                />
+                                                                <label htmlFor={`next_term_${studentId}`} className="text-[10px] font-bold text-slate-500 cursor-pointer select-none">
+                                                                    Include Next Term (+${getProgramPrice})
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input label="Enrollment ID" name="enrollment_id" placeholder="Auto-generated" disabled />
-                                <Input label="Start Session" name="start_session" type="number" defaultValue={1} min={1} required />
-                            </div>
-
-                            <div className="p-4 bg-slate-50 rounded-2xl space-y-4 border border-slate-100">
-                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <Wallet size={14} className="text-indigo-500" />
-                                    Payment Details
-                                </h3>
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input label="Total Amount ($)" name="total_amount" type="number" placeholder="0.00" required />
-                                    <Input label="Discount ($)" name="discount" type="number" placeholder="0.00" />
+                                <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 flex-shrink-0">
+                                    <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-100 transition-colors text-sm">Cancel</button>
+                                    <button 
+                                        disabled={isSubmitting || selectedStudentIds.length === 0}
+                                        className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 text-sm flex items-center gap-2"
+                                    >
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                                        Enroll {selectedStudentIds.length > 0 ? `${selectedStudentIds.length} Students` : 'Student'}
+                                    </button>
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input label="Paid Amount ($)" name="paid_amount" type="number" placeholder="0.00" required />
-                                    <Select label="Fee Type" name="payment_type">
-                                        <option value="Cash">Cash</option>
-                                        <option value="ABA">ABA PayWay</option>
-                                    </Select>
-                                </div>
-
-                                <Input label="Payment Expired" name="payment_expired" type="date" />
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition-colors text-sm">Cancel</button>
-                                <button 
-                                  disabled={isSubmitting || selectedStudentIds.length === 0}
-                                  className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 text-sm flex items-center gap-2"
-                                >
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                                    Enroll {selectedStudentIds.length > 0 ? `${selectedStudentIds.length} Students` : 'Student'}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
                     </div>
                 </div>
+            )}
+
+            {/* ROLLOVER MODAL */}
+            {showRolloverModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center">
+                                        <ArrowRight className="text-amber-600" size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-black text-slate-900">Rollover Students</h2>
+                                        <p className="text-xs text-slate-400 font-medium">Continue students to {activeTerm?.term_name}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowRolloverModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                                    <X size={20} className="text-slate-400" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <p className="text-sm text-slate-600">
+                                    Select students continuing to <strong>{activeTerm?.term_name}</strong>
+                                </p>
+                                <button 
+                                    onClick={() => {
+                                        if (rolloverStudentIds.length === classRoster.length) {
+                                            setRolloverStudentIds([]);
+                                        } else {
+                                            setRolloverStudentIds(classRoster.map(r => r.student_id));
+                                        }
+                                    }}
+                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    {rolloverStudentIds.length === classRoster.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                            </div>
+                            
+                            {classRoster.map(item => (
+                                <label key={item.student_id} className="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-indigo-100 cursor-pointer transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={rolloverStudentIds.includes(item.student_id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setRolloverStudentIds(prev => [...prev, item.student_id]);
+                                            } else {
+                                                setRolloverStudentIds(prev => prev.filter(id => id !== item.student_id));
+                                            }
+                                        }}
+                                        className="w-5 h-5 rounded border-2 border-slate-200 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                                        {item.student?.image_url ? (
+                                            <img src={item.student.image_url} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-sm font-bold text-slate-500">{item.student?.student_name?.charAt(0)}</span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-800">{item.student?.student_name}</p>
+                                        <p className="text-xs text-slate-400">{item.student?.student_code}</p>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                        
+                        {/* Footer */}
+                        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <p className="text-sm text-slate-500">
+                                <strong>{rolloverStudentIds.length}</strong> of {classRoster.length} students selected
+                            </p>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => setShowRolloverModal(false)} 
+                                    className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-100 transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleRollover}
+                                    disabled={isSubmitting || rolloverStudentIds.length === 0}
+                                    className="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 disabled:opacity-50 text-sm flex items-center gap-2"
+                                >
+                                    {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
+                                    Rollover {rolloverStudentIds.length} Students
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {viewInvoiceEnrollment && (
+                <InvoiceModal 
+                    enrollment={viewInvoiceEnrollment} 
+                    onClose={() => setViewInvoiceEnrollment(null)} 
+                />
             )}
         </div>
     );
   }
 
-  /* RENDER: CLASS BOARD VIEW */
+  /* RENDER: ENROLLMENT VIEW */
   return (
     <div className="space-y-8 pb-20">
        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Class Board</h1>
-             <p className="text-slate-500 font-medium mt-2">Manage all active classes and student enrollments</p>
+             <div className="flex items-center gap-4 mb-2">
+                <button 
+                   onClick={() => setShowAddClassModal(false)} // This is just local state now
+                   className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${!showAddClassModal ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                >
+                   Enrollment
+                </button>
+                <button 
+                   onClick={() => setShowAddClassModal(true)} 
+                   className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${showAddClassModal ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                >
+                   Add Class
+                </button>
+             </div>
+             <p className="text-slate-500 font-medium">{showAddClassModal ? 'Create and configure new classes' : 'Manage all active classes and student enrollments'}</p>
           </div>
           
-          <div className="flex gap-3">
-             <button 
-                onClick={() => setShowAddClassModal(true)} 
-                className="flex items-center gap-2 px-6 py-2.5 bg-white text-indigo-600 border-2 border-indigo-100 rounded-xl font-bold text-xs hover:bg-indigo-50 transition-all shadow-sm"
-             >
-                <Plus size={16} />
-                <span>New Class</span>
-            </button>
-             <button 
-                onClick={() => setView(view === 'grid' ? 'list' : 'grid')} 
-                className="p-2.5 bg-white text-slate-400 border-2 border-slate-100 rounded-xl hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
-             >
-                {view === 'grid' ? <LayoutList size={20} /> : <LayoutGrid size={20} />}
-            </button>
-          </div>
+          {!showAddClassModal && (
+            <div className="flex gap-3">
+               <button 
+                  onClick={() => setView(view === 'grid' ? 'list' : 'grid')} 
+                  className="p-2.5 bg-white text-slate-400 border-2 border-slate-100 rounded-xl hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
+               >
+                  {view === 'grid' ? <LayoutList size={20} /> : <LayoutGrid size={20} />}
+              </button>
+            </div>
+          )}
        </div>
 
-       {/* Search Removed */}
+       {showAddClassModal ? (
+           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                             <Plus size={20} />
+                        </div>
+                        <h2 className="text-lg font-bold text-slate-900">Create New Class</h2>
+                    </div>
+               </div>
+               <div className="p-8">
+                   <CreateClassForm onCancel={() => setShowAddClassModal(false)} onSuccess={() => setShowAddClassModal(false)} />
+               </div>
+           </div>
+       ) : (
+           <>
+               {/* Search and Filters Toolbar */}
+               <div className="flex flex-col md:flex-row items-center gap-4">
+           {/* Search */}
+           <div className="relative w-[310px]">
+               <input
+                   type="text"
+                   placeholder="Search classes..."
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                   className="w-full pl-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-400"
+               />
+               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+           </div>
+
+           {/* Branch Filter */}
+           <div className="relative w-full md:w-64">
+               <select
+                   value={filterBranch}
+                   onChange={(e) => setFilterBranch(e.target.value)}
+                   className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
+               >
+                   <option value="">All Branches</option>
+                   {branches.map(b => (
+                       <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+                   ))}
+               </select>
+               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+           </div>
+
+           {/* Program Filter */}
+           <div className="relative w-full md:w-64">
+               <select
+                   value={filterProgram}
+                   onChange={(e) => setFilterProgram(e.target.value)}
+                   className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
+               >
+                   <option value="">All Programs</option>
+                   {programs
+                       .filter(p => !filterBranch || p.branchId === filterBranch)
+                       .map(p => (
+                       <option key={p.id} value={p.id}>{p.name}</option>
+                   ))}
+               </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            </div>
+
+            {/* Day Filter */}
+            <div className="relative w-full md:w-48">
+                <select
+                    value={filterDay}
+                    onChange={(e) => setFilterDay(e.target.value)}
+                    className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
+                >
+                    <option value="">All Days</option>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                        <option key={day} value={day}>{day}</option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            </div>
+        </div>
 
        {/* Class Grid */}
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredClasses.map(cls => (
-             <ClassCard key={cls.class_id} cls={cls} enrollments={enrollments} onClick={() => setSelectedClass(cls)} />
+             <ClassCard 
+                key={cls.class_id} 
+                cls={cls} 
+                enrollments={termEnrollments} 
+                onClick={() => setSelectedClass(cls)} 
+                onEdit={() => setEditingClass(cls)}
+                onDelete={() => handleDeleteClass(cls.class_id)}
+                branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
+             />
           ))}
        </div>
 
-      {/* MODAL: ADD CLASS */}
-      {showAddClassModal && (
-          <div 
-             onClick={() => setShowAddClassModal(false)}
-             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
-          >
-               <div 
-                    onClick={(e) => e.stopPropagation()}
-                    className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-               >
-                   <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center text-white">
-                                 <Calendar size={20} />
-                            </div>
-                            <h2 className="text-lg font-bold text-slate-900">Create New Class</h2>
-                        </div>
-                        <button onClick={() => setShowAddClassModal(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl"><X size={20} /></button>
-                   </div>
-                   <CreateClassForm onCancel={() => setShowAddClassModal(false)} onSuccess={() => setShowAddClassModal(false)} />
-               </div>
-          </div>
+
+           </>
+       )}
+
+      {/* MODAL: EDIT CLASS */}
+      {editingClass && (
+          <EditClassModal 
+              cls={editingClass} 
+              onClose={() => setEditingClass(null)} 
+              onSuccess={() => setEditingClass(null)} 
+           />
       )}
+
     </div>
   );
 }
@@ -602,13 +1323,20 @@ function CreateClassForm({ onCancel, onSuccess }: { onCancel: () => void, onSucc
     const [branches, setBranches] = useState<Branch[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState("");
     const [programs, setPrograms] = useState<any[]>([]);
+    const [selectedDays, setSelectedDays] = useState<string[]>([]);
     
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState("");
 
+    const [classes, setClasses] = useState<Class[]>([]);
+
     useEffect(() => {
         const unsub = branchService.subscribe(setBranches);
-        return () => unsub();
+        const unsubClasses = subscribeToClasses(setClasses);
+        return () => {
+            unsub();
+            unsubClasses();
+        };
     }, []);
 
     useEffect(() => {
@@ -626,13 +1354,35 @@ function CreateClassForm({ onCancel, onSuccess }: { onCancel: () => void, onSucc
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setLoading(true);
+        setMsg(""); // Clear previous messages
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData);
-        const daysStr = data.days as string;
         
+        // Validation: Check for duplicate class
+        const normalizeDays = (d: string | string[]) => {
+            if (Array.isArray(d)) return d.sort().join(',');
+            return typeof d === 'string' ? d : '';
+        };
+
+        const newDaysIdx = [...selectedDays].sort().join(',');
+        
+        const isDuplicate = classes.some(c => 
+            c.branchId === selectedBranchId &&
+            c.className.trim().toLowerCase() === (data.className as string).trim().toLowerCase() &&
+            c.startTime === data.startTime &&
+            c.endTime === data.endTime &&
+            normalizeDays(c.days) === newDaysIdx
+        );
+
+        if (isDuplicate) {
+             setMsg("A class with this name, schedule, and branch already exists.");
+             setLoading(false);
+             return;
+        }
+
         const payload = {
             ...data,
-            days: daysStr.split(",").map(s => s.trim()),
+            days: selectedDays,
             branchId: selectedBranchId
         };
 
@@ -646,8 +1396,22 @@ function CreateClassForm({ onCancel, onSuccess }: { onCancel: () => void, onSucc
         }
     }
 
+    const toggleDay = (day: string) => {
+        setSelectedDays(prev => 
+            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+        );
+    };
+
     return (
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            {msg && (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600">
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                        <X size={16} />
+                    </div>
+                    <p className="text-sm font-bold">{msg}</p>
+                </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Select Branch</label>
@@ -682,7 +1446,35 @@ function CreateClassForm({ onCancel, onSuccess }: { onCancel: () => void, onSucc
                 </div>
 
                 <Input label="Class Name" name="className" required placeholder="e.g. Morning A" />
-                <Input label="Schedule" name="days" placeholder="Mon, Wed, Fri" />
+                
+                {/* Custom Days Dropdown */}
+                <div className="space-y-1.5 relative">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Schedule</label>
+                    <div className="relative group">
+                         <button
+                            type="button"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 text-left text-sm font-bold text-slate-900 focus:bg-white focus:border-indigo-500 outline-none transition-all flex justify-between items-center"
+                         >
+                            <span className={selectedDays.length ? 'text-slate-900' : 'text-slate-400'}>
+                                {selectedDays.length > 0 ? selectedDays.join(", ") : "Select Days"}
+                            </span>
+                            <ChevronDown size={16} className="text-slate-400 group-focus-within:rotate-180 transition-transform" />
+                         </button>
+                         <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-2 grid grid-cols-2 gap-2 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200">
+                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                                 <button
+                                    key={day}
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); toggleDay(day); }}
+                                    className={`px-3 py-2 rounded-lg text-xs font-bold text-left flex items-center justify-between ${selectedDays.includes(day) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-50 text-slate-600'}`}
+                                 >
+                                    {day}
+                                    {selectedDays.includes(day) && <Check size={14} />}
+                                 </button>
+                             ))}
+                         </div>
+                    </div>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                      <Input label="Start Time" name="startTime" type="time" required />
@@ -706,4 +1498,277 @@ function CreateClassForm({ onCancel, onSuccess }: { onCancel: () => void, onSucc
             </div>
         </form>
     )
+}
+
+function InvoiceModal({ enrollment, onClose }: { enrollment: Enrollment; onClose: () => void }) {
+    const total = enrollment.total_amount || 0;
+    const discount = enrollment.discount || 0;
+    const paid = enrollment.paid_amount || 0;
+    const due = Math.max(0, total - discount - paid);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+                    <div>
+                         <h2 className="text-xl font-black text-slate-900">INVOICE</h2>
+                         <p className="text-sm font-bold text-slate-400">#{enrollment.enrollment_id?.slice(-8).toUpperCase()}</p>
+                    </div>
+                    <div className="text-right">
+                        <h3 className="font-bold text-slate-800">Authentic Advanced Academy</h3>
+                        <p className="text-xs text-slate-500">Phnom Penh, Cambodia</p>
+                        <p className="text-xs text-slate-500 mt-1">{new Date().toLocaleDateString()}</p>
+                    </div>
+                </div>
+                
+                <div className="p-8 space-y-6">
+                    <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase">Bill To</p>
+                            <p className="font-bold text-slate-800 text-lg">{enrollment.student?.student_name}</p>
+                            <p className="text-xs text-slate-500">{enrollment.student?.student_code}</p>
+                        </div>
+                         <div className="text-right">
+                            <p className="text-xs font-bold text-slate-400 uppercase">Class</p>
+                            <p className="font-bold text-slate-800">{enrollment.term}</p>
+                            <p className="text-xs text-slate-500">Session {enrollment.start_session}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                             <span className="font-bold text-slate-600">Tuition Fee</span>
+                             <span className="font-bold text-slate-900">${total.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                             <span className="font-bold text-slate-600">Discount</span>
+                             <span className="font-bold text-indigo-600">-${discount.toLocaleString()}</span>
+                        </div>
+                        <div className="h-px bg-slate-100 my-2"></div>
+                        <div className="flex justify-between text-base">
+                             <span className="font-black text-slate-800">Total Due</span>
+                             <span className="font-black text-slate-900">${(total - discount).toLocaleString()}</span>
+                        </div>
+                        {(enrollment.payment_due_date || enrollment.payment_expired) && (
+                            <div className="flex justify-between text-xs pt-1">
+                                <span className="font-bold text-slate-400">Due Date</span>
+                                <span className="font-bold text-slate-600">{new Date(enrollment.payment_due_date || enrollment.payment_expired || '').toLocaleDateString()}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-sm">
+                             <span className="font-bold text-emerald-600">Paid Amount</span>
+                             <span className="font-bold text-emerald-600">-${paid.toLocaleString()}</span>
+                        </div>
+                        <div className="h-px bg-slate-100 my-2"></div>
+                        <div className="flex justify-between text-lg">
+                             <span className="font-black text-slate-800">Balance Due</span>
+                             <span className="font-black text-rose-600">${due.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 print:hidden">
+                    <button onClick={onClose} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-slate-200 text-sm">Close</button>
+                    <button onClick={() => window.print()} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2 text-sm">
+                        <Printer size={16} />
+                        Print Invoice
+                    </button>
+                </div>
+            </div>
+            
+            <style jsx global>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .fixed, .fixed * {
+                        visibility: visible;
+                    }
+                    .fixed {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: white;
+                        backdrop-filter: none;
+                        padding: 0;
+                    }
+                    .fixed > div {
+                        box-shadow: none;
+                        max-width: 100%;
+                        width: 100%;
+                    }
+                    .print\\:hidden {
+                        display: none;
+                    }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+function EditClassModal({ cls, onClose, onSuccess }: { cls: Class, onClose: () => void, onSuccess: () => void }) {
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [ PROGRAMS, setPrograms ] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [msg, setMsg] = useState("");
+
+    // Form Stats
+    const [selectedBranchId, setSelectedBranchId] = useState(cls.branchId || "");
+    const [programId, setProgramId] = useState(cls.programId || "");
+    const [selectedDays, setSelectedDays] = useState<string[]>(
+        Array.isArray(cls.days) ? cls.days : typeof cls.days === 'string' ? (cls.days as string).split(',').map(s => s.trim()) : []
+    );
+
+    useEffect(() => {
+        const unsub = branchService.subscribe(setBranches);
+        const unsubP = programService.subscribe(setPrograms);
+        return () => { unsub(); unsubP(); };
+    }, []);
+
+    // Filter programs
+    const filteredPrograms = PROGRAMS.filter(p => !p.branchId || p.branchId === selectedBranchId);
+
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        setLoading(true);
+        const formData = new FormData(e.currentTarget);
+        const data = Object.fromEntries(formData);
+        
+        try {
+            await updateClass(cls.class_id, {
+                className: data.className as string,
+                days: selectedDays,
+                startTime: data.startTime as string,
+                endTime: data.endTime as string,
+                maxStudents: parseInt(data.maxStudents as string),
+                totalSessions: parseInt(data.totalSessions as string),
+                branchId: selectedBranchId,
+                programId: programId
+            });
+            onSuccess();
+        } catch (e) {
+            setMsg("Failed to update class.");
+            alert("Failed to update class");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const toggleDay = (day: string) => {
+        setSelectedDays(prev => 
+            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+        );
+    };
+
+    return (
+        <div 
+             onClick={onClose}
+             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+             <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+             >
+                 <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                      <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-200">
+                               <Pencil size={20} />
+                          </div>
+                          <h2 className="text-lg font-bold text-slate-900">Edit Class</h2>
+                      </div>
+                      <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl"><X size={20} /></button>
+                 </div>
+                 
+                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Branch</label>
+                            <div className="relative">
+                                <select 
+                                    value={selectedBranchId} 
+                                    onChange={(e) => setSelectedBranchId(e.target.value)} 
+                                    required 
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 text-slate-900 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all appearance-none"
+                                >
+                                    <option value="">Select Branch...</option>
+                                    {branches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
+                                </select>
+                                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" size={16} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Program</label>
+                            <div className="relative">
+                                <select 
+                                    value={programId}
+                                    onChange={(e) => setProgramId(e.target.value)}
+                                    required 
+                                    disabled={!selectedBranchId}
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 text-slate-900 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all appearance-none disabled:opacity-50"
+                                >
+                                    <option value="">{selectedBranchId ? 'Select Curricula...' : 'Choose Branch First'}</option>
+                                    {filteredPrograms.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" size={16} />
+                            </div>
+                        </div>
+
+                        <Input label="Class Name" name="className" required defaultValue={cls.className} />
+                        
+                        {/* Custom Days Dropdown */}
+                        <div className="space-y-1.5 relative">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Schedule</label>
+                            <div className="relative group">
+                                <button
+                                    type="button"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 text-left text-sm font-bold text-slate-900 focus:bg-white focus:border-indigo-500 outline-none transition-all flex justify-between items-center"
+                                >
+                                    <span className={selectedDays.length ? 'text-slate-900' : 'text-slate-400'}>
+                                        {selectedDays.length > 0 ? selectedDays.join(", ") : "Select Days"}
+                                    </span>
+                                    <ChevronDown size={16} className="text-slate-400 group-focus-within:rotate-180 transition-transform" />
+                                </button>
+                                <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-2 grid grid-cols-2 gap-2 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200">
+                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); toggleDay(day); }}
+                                            className={`px-3 py-2 rounded-lg text-xs font-bold text-left flex items-center justify-between ${selectedDays.includes(day) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-50 text-slate-600'}`}
+                                        >
+                                            {day}
+                                            {selectedDays.includes(day) && <Check size={14} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                             <Input label="Start Time" name="startTime" type="time" required defaultValue={cls.startTime} />
+                             <Input label="End Time" name="endTime" type="time" required defaultValue={cls.endTime} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                             <Input label="Max Student" name="maxStudents" type="number" defaultValue={cls.maxStudents} />
+                             <Input label="Total Sessions" name="totalSessions" type="number" defaultValue={cls.totalSessions} />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                         <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl text-slate-400 font-bold text-xs hover:bg-slate-50 transition-all">
+                            Cancel
+                        </button>
+                        <button disabled={loading} className="px-8 py-3 bg-amber-500 text-white rounded-xl font-bold text-xs hover:bg-amber-600 transition-all shadow-xl shadow-amber-100 disabled:opacity-50 flex items-center gap-2">
+                            {loading ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                            <span>Save Changes</span>
+                        </button>
+                    </div>
+                </form>
+             </div>
+        </div>
+    );
 }

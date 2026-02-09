@@ -231,6 +231,28 @@ export const subscribeToEnrollments = (callback: (data: Enrollment[]) => void) =
     });
 };
 
+// Get enrollments by student ID
+export const getEnrollmentsByStudent = async (studentId: string): Promise<Enrollment[]> => {
+    const q = query(enrollmentsCol, where("student_id", "==", studentId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        enrollment_id: doc.id,
+        ...doc.data()
+    } as Enrollment));
+};
+
+// Deactivate all enrollments for a student (when status changes to Inactive/Hold)
+export const deactivateStudentEnrollments = async (studentId: string): Promise<void> => {
+    const enrollments = await getEnrollmentsByStudent(studentId);
+    const updatePromises = enrollments.map(enrollment =>
+        updateDoc(doc(db, "enrollments", enrollment.enrollment_id), {
+            status: "Inactive",
+            updated_at: Timestamp.now()
+        })
+    );
+    await Promise.all(updatePromises);
+};
+
 export const updateStudent = async (id: string, data: Partial<Student>) => {
     try {
         const docRef = doc(db, "students", id);
@@ -248,6 +270,13 @@ export const updateStudent = async (id: string, data: Partial<Student>) => {
 
 export const deleteStudent = async (id: string) => {
     try {
+        // 1. Delete all enrollments for this student
+        const enrollmentsQuery = query(enrollmentsCol, where("student_id", "==", id));
+        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+        const deleteEnrollmentPromises = enrollmentsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deleteEnrollmentPromises);
+
+        // 2. Delete the student document
         const docRef = doc(db, "students", id);
         await deleteDoc(docRef);
         return true;
@@ -303,6 +332,28 @@ export const subscribeToClasses = (callback: (classes: Class[]) => void, branchI
     }, (error) => {
         console.error("Error subscribing to classes:", error);
     });
+};
+
+export const updateClass = async (id: string, data: Partial<Class>) => {
+    try {
+        const docRef = doc(db, "classes", id);
+        await updateDoc(docRef, data);
+        return true;
+    } catch (error) {
+        console.error("Error updating class:", error);
+        throw error;
+    }
+};
+
+export const deleteClass = async (id: string) => {
+    try {
+        const docRef = doc(db, "classes", id);
+        await deleteDoc(docRef);
+        return true;
+    } catch (error) {
+        console.error("Error deleting class:", error);
+        throw error;
+    }
 };
 
 // --- Enrollment Services ---
@@ -379,12 +430,32 @@ export const getAttendance = async (classId: string, date: string) => {
     }
 };
 
-export const updateAttendanceStatus = async (attendanceId: string, status: AttendanceStatus) => {
+export const updateAttendanceStatus = async (attendanceId: string, status: AttendanceStatus, reason?: string) => {
     try {
         const docRef = doc(attendanceCol, attendanceId);
-        await updateDoc(docRef, { status, recorded_at: new Date().toISOString() });
+        const updateData: any = {
+            status,
+            recorded_at: new Date().toISOString()
+        };
+
+        // Only include reason if it's provided
+        if (reason !== undefined) {
+            updateData.reason = reason;
+        }
+
+        await updateDoc(docRef, updateData);
     } catch (error) {
         console.error("Error updating attendance:", error);
+        throw error;
+    }
+};
+
+export const deleteAttendance = async (attendanceId: string) => {
+    try {
+        const docRef = doc(attendanceCol, attendanceId);
+        await deleteDoc(docRef);
+    } catch (error) {
+        console.error("Error deleting attendance:", error);
         throw error;
     }
 };

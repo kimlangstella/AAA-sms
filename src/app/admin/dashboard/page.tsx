@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Users, 
+  UserPlus,
   GraduationCap, 
   Wallet, 
   School,
@@ -331,11 +332,11 @@ export default function DashboardPage() {
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-3">
               <button 
-                  onClick={() => router.push('/admin/students?action=add')}
-                  className="flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                  onClick={() => router.push('/admin/students/add')}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
               >
-                  <Plus size={18} />
-                  <span>Add Student</span>
+                  <UserPlus size={18} />
+                  <span className="hidden sm:inline">Add Student</span>
               </button>
               <button 
                   onClick={() => router.push('/admin/attendance')}
@@ -532,7 +533,7 @@ export default function DashboardPage() {
           </div>
 
       </div>
-    </div>
+      </div>
     </div>
   );
 }

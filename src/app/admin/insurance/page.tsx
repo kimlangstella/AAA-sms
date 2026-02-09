@@ -105,7 +105,7 @@ export default function InsurancePage() {
             className="primary flex items-center gap-2 shadow-indigo-500/20 bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition-all font-bold"
         >
           <Plus size={18} />
-          <span>New Policy</span>
+          <span>Add Insurance</span>
         </button>
       </div>
 

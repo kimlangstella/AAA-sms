@@ -15,7 +15,9 @@ import {
   School,
   Search,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Calendar,
+  CreditCard
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { signOut } from "firebase/auth";
@@ -27,6 +29,13 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
   const [activeGroup, setActiveGroup] = useState<string | null>("Dashboard");
   const router = useRouter();
   const [school, setSchool] = useState<SchoolType | null>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname === '/admin/dashboard') {
+        setActiveGroup('Dashboard');
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const unsub = subscribeToSchoolDetails(setSchool);
@@ -105,7 +114,7 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 isCollapsed={isCollapsed}
                 items={[
                     { label: "All Students", href: "/admin/students" },
-                    { label: "Admissions", href: "/admin/students?action=add" },
+                    { label: "Admissions", href: "/admin/students/add" },
                 ]}
             />
             <NavItem 
@@ -115,7 +124,17 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 setActiveGroup={setActiveGroup}
                 isCollapsed={isCollapsed}
                 items={[
-                    { label: "Class Board", href: "/admin/enrollments" },
+                    { label: "Enrollment", href: "/admin/enrollments" },
+                ]}
+            />
+            <NavItem 
+                title="Payments" 
+                icon={<CreditCard size={20} />} 
+                activeGroup={activeGroup} 
+                setActiveGroup={setActiveGroup}
+                isCollapsed={isCollapsed}
+                items={[
+                    { label: "All Payments", href: "/admin/payments" },
                 ]}
             />
             <NavItem 
@@ -125,7 +144,9 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 setActiveGroup={setActiveGroup}
                 isCollapsed={isCollapsed}
                 items={[
-                    { label: "Tracking", href: "/admin/attendance" },
+                    { label: "Terms", href: "/admin/attendance/terms" },
+                    { label: "Track Attendance", href: "/admin/attendance" },
+                    { label: "Reports", href: "/admin/attendance/reports" },
                 ]}
             />
             <NavItem 
@@ -139,6 +160,7 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                     { label: "Program Setup", href: "/admin/setup?tab=programs" },
                 ]}
             />
+
              <NavItem 
                 title="Insurance" 
                 icon={<ShieldCheck size={20} />} 
@@ -175,19 +197,20 @@ function NavItem({ title, icon, items, activeGroup, setActiveGroup, isCollapsed 
     const searchParams = useSearchParams();
     const currentPath = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '');
 
-    const isActive = activeGroup === title || items.some((i: any) => {
+    const isActive = items.some((i: any) => {
+        if (i.href === '/admin/dashboard' && pathname !== '/admin/dashboard') return false; 
         if (i.href.includes('?')) {
-            return currentPath === i.href || currentPath.startsWith(i.href + '&'); // Handle exact query match
+            return currentPath === i.href || currentPath.startsWith(i.href + '&'); 
         }
         return pathname.startsWith(i.href);
     });
     
     // Auto-expand if child is active and not collapsed
     useEffect(() => {
-        if (isActive && !isCollapsed) {
-           // Keep group active logic if needed
+        if (isActive) {
+           setActiveGroup(title);
         }
-    }, [isActive, isCollapsed]);
+    }, [isActive, title, setActiveGroup]);
 
     const isOpen = activeGroup === title;
 

@@ -29,11 +29,13 @@ export interface Branch {
 }
 
 export interface Program {
-    program_id: string;
-    program_name: string;
+    id: string; // Document ID from Firestore
+    name: string;
     description?: string;
-    total_sessions: number; // Duration
+    total_sessions?: number;
     price: number;
+    pricePerSession?: number;
+    branchId?: string;
 }
 
 export interface Class {
@@ -98,13 +100,15 @@ export interface Enrollment {
     enrollment_id: string; // Document ID
     student_id: string;
     class_id: string;
-    term: string; // e.g. 2026_T1
+    term: string; // e.g. 2026_T1 (legacy)
+    term_id?: string; // Document ID of the term
 
     total_amount: number;
     discount: number;
     paid_amount: number;
     payment_status: PaymentStatus; // "Paid" or "Unpaid"
     payment_type: PaymentType; // "Cash" or "ABA"
+    payment_due_date?: string; // Date string
     payment_expired?: string; // Date string
 
     enrollment_status: EnrollmentStatus; // Active, Hold, Completed, Dropped
@@ -138,4 +142,15 @@ export interface TimeTableEntry {
     start_time: string;
     end_time: string;
     day: string;
+}
+
+export interface Term {
+    term_id: string;
+    term_name: string; // e.g., "2026 Term 1", "Spring 2026"
+    start_date: string;
+    end_date: string;
+    branch_id: string;
+    program_ids: string[]; // Changed to array for multiple programs
+    status: 'Active' | 'Upcoming' | 'Completed' | 'Inactive';
+    created_at: string;
 }

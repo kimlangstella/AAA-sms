@@ -66,7 +66,7 @@ export default function AdminLayout({
               </button>
               
               {/* Search Bar */}
-              <div className="flex items-center w-full max-w-md px-3 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm focus-within:ring-4 focus-within:ring-indigo-100 focus-within:border-indigo-500 transition-all">
+              {/* <div className="flex items-center w-full max-w-md px-3 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm focus-within:ring-4 focus-within:ring-indigo-100 focus-within:border-indigo-500 transition-all">
                   <Search size={14} className="text-slate-400" />
                   <div className="w-px h-3 mx-2 bg-slate-200" />
                   <input 
@@ -74,7 +74,7 @@ export default function AdminLayout({
                       placeholder="Search..." 
                       className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-slate-700 placeholder:text-slate-400 p-0"
                   />
-              </div>
+              </div> */}
           </div>
 
           <div className="flex items-center gap-3 md:gap-4">
