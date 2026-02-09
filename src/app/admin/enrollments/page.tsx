@@ -15,7 +15,7 @@ import {
   Pencil,
   Loader2, LayoutGrid, LayoutList, Building2, Globe, Phone, MapPin, School, ArrowLeft, ArrowRight, User, Wallet, Landmark, Calendar, CalendarCheck, ChevronDown, Printer
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Student, Class, Enrollment, Branch } from "@/lib/types";
 import { subscribeToStudents, subscribeToClasses, subscribeToEnrollments, addEnrollment, deleteEnrollment, updateClass, deleteClass } from "@/lib/services/schoolService";
 import { branchService } from "@/services/branchService";
@@ -159,18 +159,16 @@ function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: 
 function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: Enrollment; onRemove: () => void; onViewInvoice: () => void }) {
   const student = enrollment.student;
   const isPaidAmount = getPaymentStatus(enrollment.paid_amount || 0, enrollment.total_amount || 0, enrollment.discount || 0) === 'Paid';
-  // const isExpired = enrollment.payment_due_date && new Date() > new Date(enrollment.payment_due_date);
   
-  // If expired, show as Unpaid/Expired. Prefer explicit payment_status if set to 'Unpaid' but override if Paid.
   const status = (enrollment.payment_status === 'Paid' || isPaidAmount) ? 'Paid' : 'Unpaid';
   const statusColor = status === 'Paid' ? 'emerald' : 'rose';
 
   if (!student) return null;
 
   return (
-    <div className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-100 hover:shadow-md transition-all gap-4`}>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-indigo-100 transition-all gap-4">
        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold shadow-sm overflow-hidden flex-shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-bold overflow-hidden">
              {student.image_url ? (
                  <img src={student.image_url} alt="" className="w-full h-full object-cover" />
              ) : (
@@ -178,12 +176,8 @@ function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: E
              )}
           </div>
           <div>
-             <h4 className="font-bold text-slate-900">{student.student_name}</h4>
-             <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-medium mt-0.5">
-                <span className="bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">ID: {student.student_code}</span>
-                <span>•</span>
-                <span>Session {enrollment.start_session || 1}</span>
-             </div>
+             <h4 className="font-bold text-slate-800 text-sm">{student.student_name}</h4>
+             <p className="text-[10px] text-slate-400 font-bold">ID: {student.student_code} • Session {enrollment.start_session || 1}</p>
           </div>
        </div>
        
@@ -191,40 +185,36 @@ function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: E
           <div className="flex gap-4 text-right">
              <div>
                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total</p>
-                 <p className="font-bold text-slate-900">${enrollment.total_amount?.toLocaleString() || '0'}</p>
+                 <p className="font-bold text-slate-800 text-sm">${enrollment.total_amount?.toLocaleString() || '0'}</p>
              </div>
              <div>
                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Paid</p>
-                 <p className={`font-bold ${isPaidAmount ? 'text-emerald-600' : 'text-amber-600'}`}>${enrollment.paid_amount?.toLocaleString() || '0'}</p>
+                 <p className={`font-bold text-sm ${isPaidAmount ? 'text-emerald-600' : 'text-amber-600'}`}>${enrollment.paid_amount?.toLocaleString() || '0'}</p>
              </div>
              <div className="hidden sm:block">
                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                 <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mt-0.5 bg-${statusColor}-50 text-${statusColor}-600 border-${statusColor}-100`}>
+                 <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full border bg-${statusColor}-50 text-${statusColor}-600 border-${statusColor}-100`}>
                     {status}
                  </div>
-                  {/* {isExpired && <p className="text-[9px] text-rose-500 font-bold mt-0.5">Overdue</p>} */}
-                 {(enrollment.payment_due_date || enrollment.payment_expired) && (
-                     <p className="text-[9px] text-slate-400 font-medium mt-0.5 whitespace-nowrap">
-                        Due: {new Date(enrollment.payment_due_date || enrollment.payment_expired || '').toLocaleDateString()}
-                     </p>
-                  )}
               </div>
            </div>
           
-          <button 
-             onClick={(e) => { e.stopPropagation(); onRemove(); }}
-             className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
-          >
-             <Trash2 size={16} />
-          </button>
-          
-          <button 
-             onClick={(e) => { e.stopPropagation(); onViewInvoice(); }}
-             className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all opacity-0 group-hover:opacity-100"
-             title="View Invoice"
-          >
-             <Printer size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button 
+               onClick={(e) => { e.stopPropagation(); onRemove(); }}
+               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
+            >
+               <Trash2 size={16} />
+            </button>
+            
+            <button 
+               onClick={(e) => { e.stopPropagation(); onViewInvoice(); }}
+               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+               title="View Invoice"
+            >
+               <Printer size={16} />
+            </button>
+          </div>
        </div>
     </div>
   );
@@ -261,6 +251,8 @@ function Select({ label, children, ...props }: { label: string, children: React.
 ========================= */
 
 export default function EnrollmentsPage() {
+  const router = useRouter();
+
   // Global State (HMR Trigger)
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -274,7 +266,24 @@ export default function EnrollmentsPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab');
+  const [showAddClassModal, setShowAddClassModal] = useState(tab === 'add-class');
+
+  useEffect(() => {
+    setShowAddClassModal(tab === 'add-class');
+  }, [tab]);
+
+  const handleTabChange = (toAddClass: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (toAddClass) {
+        params.set('tab', 'add-class');
+    } else {
+        params.delete('tab');
+    }
+    router.push(`/admin/enrollments?${params.toString()}`);
+  };
+
   const [showRolloverModal, setShowRolloverModal] = useState(false);
   const [rolloverStudentIds, setRolloverStudentIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -725,345 +734,57 @@ export default function EnrollmentsPage() {
                 >
                     <div 
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+                        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
                     >
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">Enroll Students</h2>
-                                <p className="text-xs font-bold text-slate-400 mt-1">Select students and configure payment</p>
+                                <h2 className="text-xl font-black text-slate-900">Enroll Student</h2>
+                                <p className="text-xs font-bold text-slate-400 mt-1">Add student to class and set payment</p>
                             </div>
                             <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                         </div>
                         
-                        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                            {/* LEFT: STUDENT SELECTION GRID */}
-                            <div className="flex-1 flex flex-col border-r border-slate-100 min-w-[300px] bg-slate-50/30">
-                                <div className="p-4 border-b border-slate-100 bg-white">
+                        <form onSubmit={handleAddStudent} className="p-8 space-y-6">
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Select Student</label>
                                     <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search students..." 
-                                            value={studentSearchQuery}
-                                            onChange={(e) => setStudentSearchQuery(e.target.value)}
-                                            className="w-full pl-4 pr-10 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all"
-                                        />
-                                        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    </div>
-                                    <div className="mt-3 flex justify-between items-center px-1">
-                                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{availableStudents.length} Students Available</span>
-                                       <span className="text-xs font-bold text-indigo-600">{selectedStudentIds.length} Selected</span>
+                                        <select 
+                                            required 
+                                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border-2 border-slate-100 text-slate-900 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all appearance-none"
+                                            onChange={(e) => setSelectedStudentIds([e.target.value])}
+                                        >
+                                            <option value="">Choose Student...</option>
+                                            {availableStudents.map(s => (
+                                                <option key={s.student_id} value={s.student_id}>{s.student_name} ({s.student_code})</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 lg:grid-cols-2 gap-3 content-start">
-                                    {availableStudents.map(student => {
-                                        const isSelected = selectedStudentIds.includes(student.student_id);
-                                        return (
-                                            <div 
-                                                key={student.student_id}
-                                                onClick={() => toggleStudent(student.student_id)}
-                                                className={`relative p-3 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md flex items-center gap-3 ${isSelected ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/10' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
-                                            >
-                                                <div className={`w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-black overflow-hidden ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
-                                                    {student.image_url ? (
-                                                        <img src={student.image_url} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        student.student_name.charAt(0)
-                                                    )}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className={`font-bold text-sm truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{student.student_name}</p>
-                                                    <p className={`text-[10px] font-bold truncate ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`}>{student.student_code}</p>
-                                                </div>
-                                                {isSelected && (
-                                                    <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-white shadow-sm">
-                                                        <Check size={12} strokeWidth={3} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                    {availableStudents.length === 0 && (
-                                        <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-300">
-                                            <Search size={32} className="mb-2 opacity-50" />
-                                            <p className="font-bold text-sm">No students found</p>
-                                        </div>
-                                    )}
+
+                                <div className="grid grid-cols-2 gap-4">
+                                     <Input label="Total Amount" type="number" name="total_amount" required defaultValue={getProgramPrice} />
+                                     <Input label="Discount" type="number" name="discount" defaultValue={0} />
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <Input label="Paid Amount" type="number" name="paid_amount" required defaultValue={0} />
+                                     <Select label="Payment Type" name="payment_type">
+                                         <option value="Cash">Cash</option>
+                                         <option value="ABA">ABA PayWay</option>
+                                     </Select>
+                                </div>
+                                <Input label="Payment Due Date (Optional)" type="date" name="payment_expired" />
                             </div>
 
-                            {/* RIGHT: CONFIGURATION & PAYMENT */}
-                            <form onSubmit={handleAddStudent} className="flex-1 flex flex-col bg-white w-full md:w-[450px] lg:w-[500px] flex-shrink-0">
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    
-                                    {/* TERM & SESSION */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Term</label>
-                                            <div className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-700 font-bold text-sm truncate">
-                                                {terms.find(t => t.status === 'Active')?.term_name || 'No Active Term'}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Batch Start Session</label>
-                                            <input 
-                                                type="number" 
-                                                min={1} 
-                                                max={selectedClass?.totalSessions || 100}
-                                                defaultValue={1}
-                                                onChange={(e) => {
-                                                    const val = Math.max(1, parseInt(e.target.value) || 1);
-                                                    setStudentPayments(prev => {
-                                                        const next = { ...prev };
-                                                        Object.keys(next).forEach(k => {
-                                                            next[k].start_session = val;
-                                                            next[k].total_amount = calculateFees(val, next[k].include_next_term);
-                                                        });
-                                                        return next;
-                                                    });
-                                                }}
-                                                className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* BATCH PAYMENT SETTINGS */}
-                                    <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-4">
-                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2">
-                                                <Wallet size={14} className="text-indigo-600" />
-                                                Batch Payment Settings
-                                            </h3>
-                                            <span className="text-[10px] font-bold text-indigo-400 bg-white px-2 py-0.5 rounded-full">Applies to all selected</span>
-                                         </div>
-                                         
-                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Total</label>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="Total" 
-                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        setStudentPayments(prev => {
-                                                            const next = { ...prev };
-                                                            Object.keys(next).forEach(k => next[k].total_amount = val);
-                                                            return next;
-                                                        })
-                                                    }}
-                                                    value={Object.values(studentPayments)[0]?.total_amount || 0}
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Discount</label>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="Discount" 
-                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        setStudentPayments(prev => {
-                                                            const next = { ...prev };
-                                                            Object.keys(next).forEach(k => next[k].discount = val);
-                                                            return next;
-                                                        })
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Paid</label>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="Paid Amount" 
-                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        setStudentPayments(prev => {
-                                                            const next = { ...prev };
-                                                            Object.keys(next).forEach(k => next[k].paid_amount = val);
-                                                            return next;
-                                                        })
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-indigo-400 uppercase">Type</label>
-                                                <select 
-                                                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setStudentPayments(prev => {
-                                                            const next = { ...prev };
-                                                            Object.keys(next).forEach(k => next[k].payment_type = val);
-                                                            return next;
-                                                        })
-                                                    }}
-                                                >
-                                                    <option value="Cash">Cash</option>
-                                                    <option value="ABA">ABA PayWay</option>
-                                                </select>
-                                            </div>
-                                         </div>
-                                         
-                                         {/* Batch Include Next Term */}
-                                         <div className="flex items-center gap-3 pt-2 border-t border-indigo-100/50">
-                                            <input 
-                                                type="checkbox" 
-                                                id="batch_next_term"
-                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                                onChange={(e) => {
-                                                    const checked = e.target.checked;
-                                                    setStudentPayments(prev => {
-                                                        const next = { ...prev };
-                                                        Object.keys(next).forEach(k => {
-                                                            next[k].include_next_term = checked;
-                                                            next[k].total_amount = calculateFees(next[k].start_session, checked);
-                                                        });
-                                                        return next;
-                                                    });
-                                                }}
-                                            />
-                                            <label htmlFor="batch_next_term" className="text-xs font-bold text-indigo-900 cursor-pointer select-none">
-                                                Include Next Term's Fee (+${getProgramPrice})
-                                            </label>
-                                         </div>
-                                    </div>
-
-                                    {/* SELECTED STUDENTS LIST (Individual Overrides) */}
-                                    <div className="space-y-4">
-                                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center justify-between">
-                                            <span>Selected Students ({selectedStudentIds.length})</span>
-                                            {selectedStudentIds.length > 0 && <span className="text-[10px] text-slate-400 normal-case">Expand to override</span>}
-                                        </h3>
-                                        
-                                        {selectedStudentIds.length === 0 ? (
-                                            <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                                                <p className="text-slate-400 font-bold text-sm">No students selected</p>
-                                                <p className="text-xs text-slate-300 mt-1">Select students from the list to configure</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {selectedStudentIds.map((studentId) => {
-                                                    const student = students.find(s => s.student_id === studentId);
-                                                    const payment = studentPayments[studentId] || { 
-                                                        total_amount: 0, discount: 0, paid_amount: 0, payment_type: 'Cash', payment_expired: '',
-                                                        start_session: 1, include_next_term: false
-                                                    };
-                                                    
-                                                    const updatePayment = (field: keyof typeof payment, value: any) => {
-                                                        setStudentPayments(prev => {
-                                                            const newState = {
-                                                                ...prev,
-                                                                [studentId]: { ...prev[studentId], [field]: value }
-                                                            };
-                                                            
-                                                            // Auto-recalculate total if start_session or include_next_term changes
-                                                            if (field === 'start_session' || field === 'include_next_term') {
-                                                                const sSession = field === 'start_session' ? value : payment.start_session;
-                                                                const incNext = field === 'include_next_term' ? value : payment.include_next_term;
-                                                                newState[studentId].total_amount = calculateFees(Number(sSession), Boolean(incNext));
-                                                            }
-                                                            
-                                                            return newState;
-                                                        });
-                                                    };
-
-                                                    return (
-                                                        <div key={studentId} className="group p-3 bg-white border border-slate-100 rounded-xl hover:shadow-sm hover:border-indigo-100 transition-all">
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                                                        {student?.student_name.charAt(0)}
-                                                                    </div>
-                                                                    <p className="font-bold text-sm text-slate-900">{student?.student_name}</p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {(() => {
-                                                                        const status = getPaymentStatus(payment.paid_amount, payment.total_amount, payment.discount);
-                                                                        return (
-                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                                                status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                                                                            }`}>
-                                                                                {status}
-                                                                            </span>
-                                                                        );
-                                                                    })()}
-                                                                    <button type="button" onClick={() => toggleStudent(studentId)} className="text-slate-300 hover:text-rose-500">
-                                                                        <X size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-4 gap-2 mb-2">
-                                                                <div className="col-span-1">
-                                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Start</label>
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={payment.start_session} 
-                                                                        max={selectedClass?.totalSessions || 100}
-                                                                        min={1}
-                                                                        onChange={e => updatePayment('start_session', parseInt(e.target.value) || 1)}
-                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-1">
-                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Total</label>
-                                                                     <input 
-                                                                        type="number" 
-                                                                        value={payment.total_amount} 
-                                                                        onChange={e => updatePayment('total_amount', parseFloat(e.target.value))}
-                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-1">
-                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Disc</label>
-                                                                     <input 
-                                                                        type="number" 
-                                                                        value={payment.discount} 
-                                                                        onChange={e => updatePayment('discount', parseFloat(e.target.value))}
-                                                                        className="w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold text-slate-700"
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-1">
-                                                                     <label className="text-[9px] font-bold text-slate-400 uppercase">Paid</label>
-                                                                     <input 
-                                                                        type="number" 
-                                                                        value={payment.paid_amount} 
-                                                                        onChange={e => updatePayment('paid_amount', parseFloat(e.target.value))}
-                                                                        className={`w-full px-2 py-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold ${payment.paid_amount > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-slate-700'}`}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    id={`next_term_${studentId}`}
-                                                                    checked={payment.include_next_term}
-                                                                    onChange={e => updatePayment('include_next_term', e.target.checked)}
-                                                                    className="w-3 h-3 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                                                />
-                                                                <label htmlFor={`next_term_${studentId}`} className="text-[10px] font-bold text-slate-500 cursor-pointer select-none">
-                                                                    Include Next Term (+${getProgramPrice})
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 flex-shrink-0">
-                                    <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-100 transition-colors text-sm">Cancel</button>
-                                    <button 
-                                        disabled={isSubmitting || selectedStudentIds.length === 0}
-                                        className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 text-sm flex items-center gap-2"
-                                    >
-                                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                                        Enroll {selectedStudentIds.length > 0 ? `${selectedStudentIds.length} Students` : 'Student'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 rounded-xl text-slate-400 font-bold text-xs hover:bg-slate-50 transition-all">Cancel</button>
+                                <button disabled={isSubmitting} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 flex items-center gap-2">
+                                    {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                                    <span>Enroll Student</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
@@ -1071,47 +792,15 @@ export default function EnrollmentsPage() {
             {/* ROLLOVER MODAL */}
             {showRolloverModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden">
-                        {/* Header */}
-                        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center">
-                                        <ArrowRight className="text-amber-600" size={20} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-black text-slate-900">Rollover Students</h2>
-                                        <p className="text-xs text-slate-400 font-medium">Continue students to {activeTerm?.term_name}</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowRolloverModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                                    <X size={20} className="text-slate-400" />
-                                </button>
-                            </div>
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50">
+                            <h2 className="text-xl font-bold text-slate-900">Rollover Students</h2>
+                            <p className="text-xs text-slate-400">Continue students to {activeTerm?.term_name}</p>
                         </div>
                         
-                        {/* Content */}
                         <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                                <p className="text-sm text-slate-600">
-                                    Select students continuing to <strong>{activeTerm?.term_name}</strong>
-                                </p>
-                                <button 
-                                    onClick={() => {
-                                        if (rolloverStudentIds.length === classRoster.length) {
-                                            setRolloverStudentIds([]);
-                                        } else {
-                                            setRolloverStudentIds(classRoster.map(r => r.student_id));
-                                        }
-                                    }}
-                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
-                                >
-                                    {rolloverStudentIds.length === classRoster.length ? 'Deselect All' : 'Select All'}
-                                </button>
-                            </div>
-                            
                             {classRoster.map(item => (
-                                <label key={item.student_id} className="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-indigo-100 cursor-pointer transition-all">
+                                <label key={item.student_id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-indigo-100 cursor-pointer transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={rolloverStudentIds.includes(item.student_id)}
@@ -1122,44 +811,26 @@ export default function EnrollmentsPage() {
                                                 setRolloverStudentIds(prev => prev.filter(id => id !== item.student_id));
                                             }
                                         }}
-                                        className="w-5 h-5 rounded border-2 border-slate-200 text-indigo-600 focus:ring-indigo-500"
+                                        className="w-5 h-5 rounded border-gray-300 text-indigo-600"
                                     />
-                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                                        {item.student?.image_url ? (
-                                            <img src={item.student.image_url} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span className="text-sm font-bold text-slate-500">{item.student?.student_name?.charAt(0)}</span>
-                                        )}
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                                        {item.student?.image_url ? <img src={item.student.image_url} className="w-full h-full object-cover" /> : item.student?.student_name?.charAt(0)}
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-slate-800">{item.student?.student_name}</p>
-                                        <p className="text-xs text-slate-400">{item.student?.student_code}</p>
-                                    </div>
+                                    <span className="text-sm font-bold text-slate-700">{item.student?.student_name}</span>
                                 </label>
                             ))}
                         </div>
                         
-                        {/* Footer */}
-                        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                            <p className="text-sm text-slate-500">
-                                <strong>{rolloverStudentIds.length}</strong> of {classRoster.length} students selected
-                            </p>
-                            <div className="flex gap-3">
-                                <button 
-                                    onClick={() => setShowRolloverModal(false)} 
-                                    className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-100 transition-colors text-sm"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={handleRollover}
-                                    disabled={isSubmitting || rolloverStudentIds.length === 0}
-                                    className="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 disabled:opacity-50 text-sm flex items-center gap-2"
-                                >
-                                    {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
-                                    Rollover {rolloverStudentIds.length} Students
-                                </button>
-                            </div>
+                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                            <button onClick={() => setShowRolloverModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-100 text-sm">Cancel</button>
+                            <button 
+                                onClick={handleRollover}
+                                disabled={isSubmitting || rolloverStudentIds.length === 0}
+                                className="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 shadow-lg shadow-amber-100 disabled:opacity-50 text-sm flex items-center gap-2"
+                            >
+                                {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
+                                Rollover
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1174,38 +845,54 @@ export default function EnrollmentsPage() {
     );
   }
 
-  /* RENDER: ENROLLMENT VIEW */
+   /* RENDER: ENROLLMENT VIEW */
   return (
-    <div className="space-y-8 pb-20">
-       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="space-y-8 pb-20 max-w-[98%] mx-auto">
+       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-             <div className="flex items-center gap-4 mb-2">
+             <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+                {showAddClassModal ? 'Create New Class' : 'Enrollments'}
+             </h1>
+             <p className="text-slate-400 font-bold text-sm">
+                {showAddClassModal ? 'Setup and configure a new class roster' : 'Manage academic classes and student rosters'}
+             </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+             <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
                 <button 
-                   onClick={() => setShowAddClassModal(false)} // This is just local state now
-                   className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${!showAddClassModal ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                   onClick={() => handleTabChange(false)}
+                   className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${!showAddClassModal ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                   Enrollment
+                   Classes
                 </button>
                 <button 
-                   onClick={() => setShowAddClassModal(true)} 
-                   className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${showAddClassModal ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                   onClick={() => handleTabChange(true)} 
+                   className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${showAddClassModal ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                    Add Class
                 </button>
              </div>
-             <p className="text-slate-500 font-medium">{showAddClassModal ? 'Create and configure new classes' : 'Manage all active classes and student enrollments'}</p>
+
+             {!showAddClassModal && (
+                <div className="flex bg-white rounded-2xl p-1 border border-slate-100 shadow-sm">
+                   <button 
+                      onClick={() => setView('grid')} 
+                      className={`p-2 rounded-xl transition-all ${view === 'grid' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                      title="Grid View"
+                   >
+                      <LayoutGrid size={18} />
+                  </button>
+                   <button 
+                      onClick={() => setView('list')} 
+                      className={`p-2 rounded-xl transition-all ${view === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                      title="List View"
+                   >
+                      <LayoutList size={18} />
+                  </button>
+                </div>
+             )}
           </div>
-          
-          {!showAddClassModal && (
-            <div className="flex gap-3">
-               <button 
-                  onClick={() => setView(view === 'grid' ? 'list' : 'grid')} 
-                  className="p-2.5 bg-white text-slate-400 border-2 border-slate-100 rounded-xl hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
-               >
-                  {view === 'grid' ? <LayoutList size={20} /> : <LayoutGrid size={20} />}
-              </button>
-            </div>
-          )}
        </div>
 
        {showAddClassModal ? (
@@ -1219,91 +906,91 @@ export default function EnrollmentsPage() {
                     </div>
                </div>
                <div className="p-8">
-                   <CreateClassForm onCancel={() => setShowAddClassModal(false)} onSuccess={() => setShowAddClassModal(false)} />
+                   <CreateClassForm onCancel={() => handleTabChange(false)} onSuccess={() => handleTabChange(false)} />
                </div>
            </div>
-       ) : (
-           <>
+        ) : (
+           <div className="space-y-6">
                {/* Search and Filters Toolbar */}
-               <div className="flex flex-col md:flex-row items-center gap-4">
-           {/* Search */}
-           <div className="relative w-[310px]">
-               <input
-                   type="text"
-                   placeholder="Search classes..."
-                   value={searchQuery}
-                   onChange={(e) => setSearchQuery(e.target.value)}
-                   className="w-full pl-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-400"
-               />
-               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+               <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                   {/* Search */}
+                   <div className="relative w-full md:w-[310px]">
+                       <input
+                           type="text"
+                           placeholder="Search..."
+                           value={searchQuery}
+                           onChange={(e) => setSearchQuery(e.target.value)}
+                           className="w-full pl-6 pr-12 py-3 bg-white border border-slate-200 rounded-full font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm"
+                       />
+                       <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                   </div>
+
+                   <div className="flex flex-wrap items-center gap-3">
+                       {/* Branch Filter */}
+                       <div className="relative">
+                           <select
+                               value={filterBranch}
+                               onChange={(e) => setFilterBranch(e.target.value)}
+                               className="pl-4 pr-10 py-2.5 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer min-w-[160px]"
+                           >
+                               <option value="">All Branches</option>
+                               {branches.map(b => (
+                                   <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+                               ))}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                       </div>
+
+                       {/* Program Filter */}
+                       <div className="relative">
+                           <select
+                               value={filterProgram}
+                               onChange={(e) => setFilterProgram(e.target.value)}
+                               className="pl-4 pr-10 py-2.5 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer min-w-[160px]"
+                           >
+                               <option value="">All Programs</option>
+                               {programs
+                                   .filter(p => !filterBranch || p.branchId === filterBranch)
+                                   .map(p => (
+                                   <option key={p.id} value={p.id}>{p.name}</option>
+                               ))}
+                           </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                        </div>
+
+                        {/* Day Filter */}
+                        <div className="relative">
+                            <select
+                                value={filterDay}
+                                onChange={(e) => setFilterDay(e.target.value)}
+                                className="pl-4 pr-10 py-2.5 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer min-w-[140px]"
+                            >
+                                <option value="">Select Day</option>
+                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                                    <option key={day} value={day}>{day}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                        </div>
+                    </div>
+               </div>
+
+               {/* Class Grid */}
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredClasses.map(cls => (
+                     <ClassCard 
+                        key={cls.class_id} 
+                        cls={cls} 
+                        enrollments={termEnrollments} 
+                        onClick={() => setSelectedClass(cls)} 
+                        onEdit={() => setEditingClass(cls)}
+                        onDelete={() => handleDeleteClass(cls.class_id)}
+                        branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
+                     />
+                  ))}
+               </div>
            </div>
-
-           {/* Branch Filter */}
-           <div className="relative w-full md:w-64">
-               <select
-                   value={filterBranch}
-                   onChange={(e) => setFilterBranch(e.target.value)}
-                   className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
-               >
-                   <option value="">All Branches</option>
-                   {branches.map(b => (
-                       <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
-                   ))}
-               </select>
-               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-           </div>
-
-           {/* Program Filter */}
-           <div className="relative w-full md:w-64">
-               <select
-                   value={filterProgram}
-                   onChange={(e) => setFilterProgram(e.target.value)}
-                   className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
-               >
-                   <option value="">All Programs</option>
-                   {programs
-                       .filter(p => !filterBranch || p.branchId === filterBranch)
-                       .map(p => (
-                       <option key={p.id} value={p.id}>{p.name}</option>
-                   ))}
-               </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-            </div>
-
-            {/* Day Filter */}
-            <div className="relative w-full md:w-48">
-                <select
-                    value={filterDay}
-                    onChange={(e) => setFilterDay(e.target.value)}
-                    className="w-full px-4 pr-10 py-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
-                >
-                    <option value="">All Days</option>
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                        <option key={day} value={day}>{day}</option>
-                    ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-            </div>
-        </div>
-
-       {/* Class Grid */}
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredClasses.map(cls => (
-             <ClassCard 
-                key={cls.class_id} 
-                cls={cls} 
-                enrollments={termEnrollments} 
-                onClick={() => setSelectedClass(cls)} 
-                onEdit={() => setEditingClass(cls)}
-                onDelete={() => handleDeleteClass(cls.class_id)}
-                branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
-             />
-          ))}
-       </div>
-
-
-           </>
-       )}
+        )}
 
       {/* MODAL: EDIT CLASS */}
       {editingClass && (

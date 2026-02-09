@@ -248,6 +248,7 @@ export default function AddStudentPage() {
                     ...newProgramData,
                     program_name: program.name,
                     class_name: cls.className,
+                    total_sessions: totalSessions,
                     price: calculatedPrice.toFixed(2),
                     // Store for re-edit
                     start_session: newProgramData.start_session,
@@ -262,6 +263,7 @@ export default function AddStudentPage() {
                 ...newProgramData,
                 program_name: program.name,
                 class_name: cls.className,
+                total_sessions: totalSessions,
                 price: calculatedPrice.toFixed(2),
                 // Store for re-edit
                 start_session: newProgramData.start_session,
@@ -445,6 +447,7 @@ export default function AddStudentPage() {
               status: formData.status,
               admission_date: formData.admission_date,
               image_url: imageUrl,
+              branch_name: branches.find(b => b.branch_id === formData.branch_id)?.branch_name || ""
           };
 
           const newStudent = await addStudent(studentPayload);
@@ -485,7 +488,14 @@ export default function AddStudentPage() {
               };
               
               const enrId = await addEnrollment(enrollmentPayload);
-              newEnrollments.push({ enrollment_id: enrId, ...enrollmentPayload });
+              newEnrollments.push({ 
+                  enrollment_id: enrId, 
+                  ...enrollmentPayload,
+                  program_name: prog.program_name,
+                  class_name: prog.class_name,
+                  total_sessions: prog.total_sessions,
+                  admission_date: prog.admission_date
+              });
           }
 
           // Success! Move to Step 4 (Invoice)
@@ -551,98 +561,104 @@ export default function AddStudentPage() {
 
         <form onSubmit={(e) => e.preventDefault()}> 
             
-            {/* STEP 1: Student & Parent */}
+            {/* STEP 1: Personal Information */}
             {currentStep === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                      
-                     {/* Student Info Card */}
-                     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200">
-                                <User size={20} />
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200">
+                                    <User size={20} />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800">Student & Guardian Info</h3>
                             </div>
-                            <h3 className="text-lg font-bold text-slate-800">Student Information</h3>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-slate-100">Step 1 of 3</span>
                         </div>
                         
-                        <div className="p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
-                            
-                            {/* Photo Upload */}
-                            <div className="md:col-span-3 flex flex-col pt-2">
-                                <div className="relative group w-full aspect-[3/4] rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-indigo-400 hover:bg-indigo-50/10 cursor-pointer">
-                                    {imagePreview ? (
-                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <>
-                                            <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                                <Upload size={20} />
-                                            </div>
-                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-indigo-500">Upload Photo</span>
-                                        </>
-                                    )}
-                                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                                </div>
-                            </div>
-
-                            {/* Inputs */}
-                            <div className="md:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                                <Input label="First Name" name="first_name" value={formData.first_name} onChange={handleInputChange} required />
-                                <Input label="Last Name" name="last_name" value={formData.last_name} onChange={handleInputChange} required />
-                                
-                                <Select label="Branch Name" name="branch_id" value={formData.branch_id} onChange={handleInputChange} required>
-                                    <option value="">Select Branch</option>
-                                    {branches.map(b => (
-                                        <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
-                                    ))}
-                                </Select>
-                                
-                                <Select label="Gender" name="gender" value={formData.gender} onChange={handleInputChange} required>
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </Select>
-
-                                <Input label="Date of Birth" name="dob" type="date" value={formData.dob} onChange={handleInputChange} required />
-                                <Input label="Place of Birth" name="pob" value={formData.pob} onChange={handleInputChange} icon={<MapPin size={16} />} />
-                                
-                                <Select label="Nationality" name="nationality" value={formData.nationality} onChange={handleInputChange} required>
-                                    <option value="">Select Nationality</option>
-                                    {COUNTRIES.map(c => (
-                                        <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
-                                    ))}
-                                </Select>
-
-                                <Input 
-                                    label="Phone Number" 
-                                    name="phone" 
-                                    value={formData.phone} 
-                                    onChange={handleInputChange} 
-                                    icon={<Phone size={16} />} 
-                                    error={validationErrors.phone}
-                                />
-                                <div className="md:col-span-2">
-                                     <Input label="Email Address" name="email" type="email" value={formData.email} onChange={handleInputChange} icon={<Mail size={16} />} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Parent Info Card */}
-                    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                         <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-200">
-                                <ShieldAlert size={20} />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-800">Guardian Information</h3>
-                        </div>
                         <div className="p-8">
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Input label="Father's Name" name="father_name" value={formData.father_name} onChange={handleInputChange} />
-                                <Input label="Mother's Name" name="mother_name" value={formData.mother_name} onChange={handleInputChange} />
-                                <Input label="Contact Number" name="parent_phone" value={formData.parent_phone} onChange={handleInputChange} required icon={<Phone size={16} />} />
-                                <Input label="Address" name="address" value={formData.address} onChange={handleInputChange} icon={<MapPin size={16} />} />
+                            {/* Student Section */}
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                                
+                                {/* Photo Upload */}
+                                <div className="md:col-span-3 flex flex-col">
+                                    <div className="relative group w-full aspect-[3/4] rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-indigo-400 hover:bg-indigo-50/10 cursor-pointer shadow-inner">
+                                        {imagePreview ? (
+                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <>
+                                                <div className="w-12 h-12 rounded-full bg-white text-indigo-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                                                    <Upload size={20} />
+                                                </div>
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider group-hover:text-indigo-500">Upload Photo</span>
+                                            </>
+                                        )}
+                                        <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                                    </div>
+                                </div>
+
+                                {/* Student Fields */}
+                                <div className="md:col-span-9 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                                        <Input label="First Name" name="first_name" value={formData.first_name} onChange={handleInputChange} required />
+                                        <Input label="Last Name" name="last_name" value={formData.last_name} onChange={handleInputChange} required />
+                                        
+                                        <Select label="Branch Name" name="branch_id" value={formData.branch_id} onChange={handleInputChange} required>
+                                            <option value="">Select Branch</option>
+                                            {branches.map(b => (
+                                                <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+                                            ))}
+                                        </Select>
+                                        
+                                        <Select label="Gender" name="gender" value={formData.gender} onChange={handleInputChange} required>
+                                            <option value="">Select Gender</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                        </Select>
+
+                                        <Input label="Date of Birth" name="dob" type="date" value={formData.dob} onChange={handleInputChange} required />
+                                        <Input label="Place of Birth" name="pob" value={formData.pob} onChange={handleInputChange} icon={<MapPin size={16} />} />
+                                        
+                                        <Select label="Nationality" name="nationality" value={formData.nationality} onChange={handleInputChange} required>
+                                            <option value="">Select Nationality</option>
+                                            {COUNTRIES.map(c => (
+                                                <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
+                                            ))}
+                                        </Select>
+
+                                        <Input 
+                                            label="Phone Number" 
+                                            name="phone" 
+                                            value={formData.phone} 
+                                            onChange={handleInputChange} 
+                                            icon={<Phone size={16} />} 
+                                            error={validationErrors.phone}
+                                        />
+
+                                        <Input label="Email Address" name="email" type="email" value={formData.email} onChange={handleInputChange} icon={<Mail size={16} />} />
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="relative py-4">
+                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                            <div className="w-full border-t border-slate-100"></div>
+                                        </div>
+                                        <div className="relative flex justify-start">
+                                            <span className="pr-4 bg-white text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Guardian Details</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Guardian Fields */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                                        <Input label="Father's Name" name="father_name" value={formData.father_name} onChange={handleInputChange} />
+                                        <Input label="Mother's Name" name="mother_name" value={formData.mother_name} onChange={handleInputChange} />
+                                        <Input label="Contact Number" name="parent_phone" value={formData.parent_phone} onChange={handleInputChange} required icon={<Phone size={16} />} error={validationErrors.parent_phone} />
+                                        <Input label="Full Address" name="address" value={formData.address} onChange={handleInputChange} icon={<MapPin size={16} />} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                     </div>
 
                 </div>
             )}
@@ -859,16 +875,35 @@ export default function AddStudentPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                                 {createdEnrollments.map((enr, idx) => (
-                                    <tr key={idx}>
-                                        <td className="py-4 px-4">
-                                            <p className="font-bold text-slate-700">Tuition Fee</p>
-                                            <p className="text-xs text-slate-400">Term: {enr.term}</p>
+                                    <tr key={idx} className="border-b border-slate-50 print:border-slate-100">
+                                        <td className="py-6 px-4">
+                                            <p className="font-bold text-slate-800 text-base">{enr.program_name || "Tuition Fee"}</p>
+                                            <div className="mt-2 space-y-1">
+                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                                                    <School size={12} className="text-slate-400" />
+                                                    {createdStudent.branch_name}
+                                                </p>
+                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                                                    <BookOpen size={12} className="text-slate-400" />
+                                                    {enr.class_name}
+                                                </p>
+                                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                                                    <Calendar size={12} className="text-slate-300" />
+                                                    Reg: {new Date(enr.admission_date).toLocaleDateString()}
+                                                </p>
+                                            </div>
                                         </td>
-                                        <td className="py-4 px-4 text-center">
-                                            <span className="font-bold text-slate-600">-</span>
+                                        <td className="py-6 px-4 text-center">
+                                            <div className="inline-flex flex-col items-center">
+                                                <span className="text-xs font-black text-slate-400 uppercase tracking-tighter mb-1">Sessions</span>
+                                                <span className="font-mono font-bold text-slate-600 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                                                    {enr.start_session} - {enr.total_sessions || 12}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td className="py-4 px-4 text-right font-bold text-slate-700">
-                                            ${Number(enr.total_amount).toFixed(2)}
+                                        <td className="py-6 px-4 text-right">
+                                            <span className="font-black text-slate-800 text-lg">${Number(enr.total_amount).toFixed(2)}</span>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{enr.term}</p>
                                         </td>
                                     </tr>
                                 ))}

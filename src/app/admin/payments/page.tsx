@@ -230,14 +230,14 @@ export default function PaymentsPage() {
             <div className="flex flex-wrap items-center gap-3 flex-1 w-full md:w-auto">
                  {/* Search */}
                 <div className="relative w-full md:w-[310px]">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Search students..." 
+                        placeholder="Search..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-4 pr-10 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-400"
+                        className="w-full pl-6 pr-12 py-3 bg-white border border-slate-200 rounded-full font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm"
                     />
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 </div>
 
                 {/* Filters */}
@@ -489,9 +489,9 @@ function PaymentGroupRow({ group, onUpdate, onDelete, onEdit }: { group: any, on
                 </td>
                 <td className="py-4 px-6">
                     <div className="flex flex-wrap gap-1">
-                        {group.items.map((item: any, i: number) => (
+                        {Array.from(new Set(group.items.map((item: any) => item.className))).map((className: any, i: number) => (
                             <span key={i} className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                {item.className}
+                                {className}
                             </span>
                         ))}
                     </div>

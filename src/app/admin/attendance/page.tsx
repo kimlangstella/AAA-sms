@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Loader2, Calendar, Clock, Users, CheckCircle2, FileText, Filter, ArrowLeft, Download } from "lucide-react";
+import { BookOpen, Loader2, Calendar, Clock, Users, CheckCircle2, FileText, Filter, ArrowLeft, Download, ChevronDown } from "lucide-react";
 
 import { Term, Class, Student, Enrollment, Attendance, AttendanceStatus } from "@/lib/types";
 import { termService } from "@/services/termService";
@@ -82,8 +82,8 @@ export default function TrackAttendancePage() {
     const { lockedSessions, setLockedSessions, initializeLocks, toggleLock, isLocked } = useAttendanceLocking();
     const [sessionDates, setSessionDates] = useState<Record<string, Record<number, string>>>({});
     
-    // Export Modal State
-    const [showExportModal, setShowExportModal] = useState(false);
+    // Export Dropdown State
+    const [showExportDropdown, setShowExportDropdown] = useState(false);
     const [exportOptions, setExportOptions] = useState({
         scope: 'current',
         showId: false, // Default per request
@@ -692,58 +692,41 @@ export default function TrackAttendancePage() {
                     </div>
                 </div>
                 
-                <button 
-                    onClick={() => setShowExportModal(true)}
-                    disabled={displayClasses.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <FileText size={16} />
-                    <span>Export / Print</span>
-                </button>
+                <div className="relative">
+                    <button 
+                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                        disabled={displayClasses.length === 0}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FileText size={16} />
+                        <span>Export / Print</span>
+                        <ChevronDown size={14} className={`transition-transform duration-200 ${showExportDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showExportDropdown && (
+                        <>
+                            <div className="fixed inset-0 z-20" onClick={() => setShowExportDropdown(false)} />
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                <button
+                                    onClick={() => { handlePrint(); setShowExportDropdown(false); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-indigo-50 text-indigo-600 transition-colors text-sm text-left font-bold"
+                                >
+                                    <FileText size={16} />
+                                    <span>Print View</span>
+                                </button>
+                                <button
+                                    onClick={() => { handleExportExcel(); setShowExportDropdown(false); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors text-sm text-left font-bold"
+                                >
+                                    <Download size={16} />
+                                    <span>Export Excel</span>
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
             
-            {showExportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
-                        <h2 className="text-xl font-black text-slate-800 mb-6">Export Options</h2>
-                        
-                        <div className="space-y-6">
-                            {/* Scope */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase">Scope</label>
-                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                                    <p className="font-bold text-slate-700">{displayClasses.length} Classes Selected</p>
-                                    <p className="text-xs text-slate-400 mt-1">Based on current filters (Term, Program, etc.)</p>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="grid grid-cols-2 gap-4 pt-4">
-                                <button
-                                    onClick={handlePrint}
-                                    className="flex items-center justify-center gap-2 py-4 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-                                >
-                                    <FileText size={18} />
-                                    Print View
-                                </button>
-                                <button
-                                    onClick={handleExportExcel}
-                                    className="flex items-center justify-center gap-2 py-4 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
-                                >
-                                    <Download size={18} />
-                                    Export Excel
-                                </button>
-                            </div>
-                            <button 
-                                onClick={() => setShowExportModal(false)}
-                                className="w-full py-3 text-slate-400 font-bold text-sm hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* FILTERS */}
             <div className="glass-panel p-5 space-y-4">

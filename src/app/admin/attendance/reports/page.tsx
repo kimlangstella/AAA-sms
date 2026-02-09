@@ -12,6 +12,7 @@ import {
     subscribeToAttendance 
 } from "@/lib/services/schoolService";
 import { Student, Enrollment, Attendance } from "@/lib/types";
+import * as XLSX from "xlsx";
 
 interface StudentReport {
     student: Student;
@@ -22,6 +23,7 @@ interface StudentReport {
     absents: number;
     leaves: number;
     attendanceRate: number;
+    notes?: string;
 }
 
 export default function AttendanceReportsPage() {
@@ -37,6 +39,62 @@ export default function AttendanceReportsPage() {
     const [filterTerm, setFilterTerm] = useState(""); // Added term filter
     const [filterProgram, setFilterProgram] = useState("");
     const [filterClass, setFilterClass] = useState("");
+
+    const handleExport = () => {
+        if (reportData.length === 0) return;
+
+        // 1. Resolve metadata for header
+        const branchName = branches.find(b => b.branch_id === filterBranch)?.branch_name || "All Branches";
+        const termName = terms.find(t => t.term_id === filterTerm)?.term_name || "All Terms";
+        const programName = programs.find(p => p.id === filterProgram)?.name || programs.find(p => p.id === filterProgram)?.program_name || "All Programs";
+        const className = classes.find(c => c.class_id === filterClass)?.className || "All Classes";
+
+        // 2. Prepare Header Rows
+        const headerRows = [
+            ["Authentic Advanced Academy (AAA)"],
+            ["Attendance Report"],
+            [`Date: ${new Date().toLocaleDateString()}`],
+            [`Filter - Term: ${termName} | Branch: ${branchName} | Program: ${programName} | Class: ${className}`],
+            [], // Spacer
+            ["Student Name", "Code", "Class", "Present", "Absent", "Leave", "Total Sessions", "Attendance Rate (%)", "Notes"]
+        ];
+
+        // 3. Prepare Data Rows
+        const dataRows = reportData.map(r => [
+            r.student?.student_name || "N/A",
+            r.student?.student_code || "N/A",
+            r.className,
+            r.presents,
+            r.absents,
+            r.leaves,
+            r.totalSessions,
+            `${r.attendanceRate}%`,
+            r.notes || ""
+        ]);
+
+        // 4. Combine and Create Sheet
+        const allRows = [...headerRows, ...dataRows];
+        const worksheet = XLSX.utils.aoa_to_sheet(allRows);
+
+        // 5. Apply Column Formatting (Basic width)
+        const wscols = [
+            { wch: 30 }, // Student Name
+            { wch: 15 }, // Code
+            { wch: 20 }, // Class
+            { wch: 10 }, // Present
+            { wch: 10 }, // Absent
+            { wch: 10 }, // Leave
+            { wch: 15 }, // Total
+            { wch: 15 }, // Rate
+            { wch: 40 }, // Notes
+        ];
+        worksheet['!cols'] = wscols;
+
+        // 6. Write File
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+        XLSX.writeFile(workbook, `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
 
     useEffect(() => {
         const unsubBranches = branchService.subscribe(setBranches);
@@ -208,6 +266,7 @@ export default function AttendanceReportsPage() {
                     <h1 className="text-lg font-bold text-slate-800">Attendance Reports</h1>
                 </div>
                 <button 
+                    onClick={handleExport}
                     className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={reportData.length === 0}
                 >
@@ -225,12 +284,34 @@ export default function AttendanceReportsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Term</label>
+                        <select
+                            value={filterTerm}
+                            onChange={(e) => {
+                                setFilterTerm(e.target.value);
+                                setFilterBranch(""); // Reset branch when term changes? 
+                                // Actually, if a term is selected, maybe we should auto-select the branch
+                                const term = terms.find(t => t.term_id === e.target.value);
+                                if (term) setFilterBranch(term.branch_id);
+                                setFilterProgram("");
+                                setFilterClass("");
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
+                        >
+                            <option value="">All Terms</option>
+                            {terms.map(term => (
+                                <option key={term.term_id} value={term.term_id}>{term.term_name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Branch</label>
                         <select
                             value={filterBranch}
                             onChange={(e) => {
                                 setFilterBranch(e.target.value);
-                                setFilterTerm(""); // Reset term when branch changes
+                                // setFilterTerm(""); // Don't reset term here if we want term to be primary
                                 setFilterProgram("");
                                 setFilterClass("");
                             }}
@@ -239,24 +320,6 @@ export default function AttendanceReportsPage() {
                             <option value="">All Branches</option>
                             {branches.map(branch => (
                                 <option key={branch.branch_id} value={branch.branch_id}>{branch.branch_name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Term</label>
-                        <select
-                            value={filterTerm}
-                            onChange={(e) => {
-                                setFilterTerm(e.target.value);
-                                setFilterProgram("");
-                                setFilterClass("");
-                            }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
-                        >
-                            <option value="">All Terms</option>
-                            {filteredTerms.map(term => (
-                                <option key={term.term_id} value={term.term_id}>{term.term_name}</option>
                             ))}
                         </select>
                     </div>

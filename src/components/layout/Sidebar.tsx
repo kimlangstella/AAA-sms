@@ -124,7 +124,8 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 setActiveGroup={setActiveGroup}
                 isCollapsed={isCollapsed}
                 items={[
-                    { label: "Enrollment", href: "/admin/enrollments" },
+                    { label: "Enrollment", href: "/admin/enrollments?tab=enrollment" },
+                    { label: "Add Class", href: "/admin/enrollments?tab=add-class" },
                 ]}
             />
             <NavItem 
@@ -158,6 +159,7 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 items={[
                     { label: "Branch Setup", href: "/admin/setup?tab=branches" },
                     { label: "Program Setup", href: "/admin/setup?tab=programs" },
+                    { label: "Import Data", href: "/admin/import" },
                 ]}
             />
 

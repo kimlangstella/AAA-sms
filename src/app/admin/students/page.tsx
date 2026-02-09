@@ -17,6 +17,7 @@ import {
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { AddInsuranceModal } from "@/components/modals/AddInsuranceModal";
+import ImportStudentModal from "@/components/modals/ImportStudentModal";
 
 // Column definition
 const ALL_COLUMNS = [
@@ -71,12 +72,14 @@ export default function StudentsPage() {
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [showSortPanel, setShowSortPanel] = useState(false);
     const [showColumnPanel, setShowColumnPanel] = useState(false);
+    const [showBulkActions, setShowBulkActions] = useState(false);
 
     // Action Menu State
     const [activeActionId, setActiveActionId] = useState<string | null>(null);
 
     // Modals State
     const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState("");
 
     // Selection State
@@ -336,52 +339,46 @@ export default function StudentsPage() {
         <div className="max-w-[98%] mx-auto space-y-6 pb-8">
             
             {/* Header / Title */}
-            <div className="flex items-center justify-between py-2">
-                 <h1 className="text-2xl font-black text-slate-800">Students <span className="text-sm font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-2">{filteredAndSortedStudents.length}</span></h1>
+            <div className="flex items-center justify-between py-2 px-1">
+                 <div className="flex items-center gap-4">
+                    <h1 className="text-2xl font-black text-slate-800">Students <span className="text-sm font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-2">{filteredAndSortedStudents.length}</span></h1>
+                 </div>
+                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => router.push('/admin/students/add')}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200/50"
+                    >
+                        <UserPlus size={18} />
+                        <span>Add Student</span>
+                    </button>
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-full text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50"
+                        title="Export CSV"
+                    >
+                        <Download size={18} />
+                    </button>
+                    <button
+                        onClick={() => setShowImportModal(true)}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-slate-900 transition-all shadow-lg shadow-slate-200/50"
+                    >
+                        <Download size={18} className="rotate-180" />
+                        <span>Import Student</span>
+                    </button>
+                 </div>
             </div>
 
-            {/* Bulk Actions Header (Overrides Toolbar if selection active) */}
-            {selectedStudents.size > 0 && (
-                <div className="sticky top-4 z-40 bg-indigo-900 text-white p-4 rounded-2xl shadow-xl flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-white">
-                            {selectedStudents.size}
-                        </div>
-                        <div>
-                            <p className="font-bold text-white text-sm">Students Selected</p>
-                            <p className="text-xs text-indigo-200">Apply actions to selected items</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setSelectedStudents(new Set())}
-                            className="px-4 py-2 rounded-xl bg-transparent hover:bg-white/10 text-white text-xs font-bold transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <div className="w-px h-8 bg-white/10 mx-2" />
-                        <button
-                            onClick={handleBulkDelete}
-                            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-lg shadow-rose-900/20"
-                        >
-                            <Trash2 size={16} />
-                            <span>Delete Selected</span>
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* TOOLBAR */}
-            <div className={`flex flex-col md:flex-row items-center justify-between gap-3 ${selectedStudents.size > 0 ? 'opacity-50 pointer-events-none filter blur-[1px]' : ''}`}>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
                 
                 {/* Search */}
-                <div className="relative w-full md:w-96">
+                <div className="relative w-full md:w-[310px]">
                     <input
                         type="text"
                         placeholder="Search..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-6 pr-12 py-3 bg-white text-slate-700 rounded-full border border-slate-100 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-medium"
+                        className="w-full pl-6 pr-12 py-3 bg-white text-slate-700 rounded-full border border-slate-100 shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm font-bold placeholder:text-slate-400"
                     />
                     <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 </div>
@@ -403,18 +400,18 @@ export default function StudentsPage() {
                         {showFilterPanel && (
                             <>
                                 <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-64 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                                     <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1">
                                         
                                         {/* Status */}
                                         <div className="px-2 py-2">
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Status</h4>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status</h4>
                                             <div className="space-y-0.5">
                                                 {['Active', 'Inactive', 'Hold'].map(status => (
                                                     <button
                                                         key={status}
                                                         onClick={() => setFilterStatus(filterStatus === status ? "" : status)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
                                                     >
                                                         <span>{status}</span>
                                                         {filterStatus === status && <Check size={14} className="text-indigo-500" />}
@@ -423,17 +420,17 @@ export default function StudentsPage() {
                                             </div>
                                         </div>
 
-                                        <div className="h-px bg-zinc-800 my-1" />
+                                        <div className="h-px bg-slate-50 my-1" />
 
                                         {/* Branch */}
                                         <div className="px-2 py-2">
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Branch</h4>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Branch</h4>
                                             <div className="space-y-0.5">
                                                 {branches.map(b => (
                                                     <button
                                                         key={b.branch_id}
                                                         onClick={() => setFilterBranch(filterBranch === b.branch_id ? "" : b.branch_id)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
                                                     >
                                                         <span className="truncate">{b.branch_name}</span>
                                                         {filterBranch === b.branch_id && <Check size={14} className="text-indigo-500" />}
@@ -442,17 +439,17 @@ export default function StudentsPage() {
                                             </div>
                                         </div>
 
-                                         <div className="h-px bg-zinc-800 my-1" />
+                                         <div className="h-px bg-slate-50 my-1" />
 
                                          {/* Payment Status */}
                                          <div className="px-2 py-2">
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Payment</h4>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Payment</h4>
                                             <div className="space-y-0.5">
                                                 {['Paid', 'Unpaid'].map(status => (
                                                     <button
                                                         key={status}
                                                         onClick={() => setFilterPaymentStatus(filterPaymentStatus === status ? "" : status)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
                                                     >
                                                         <span>{status}</span>
                                                         {filterPaymentStatus === status && <Check size={14} className="text-indigo-500" />}
@@ -481,7 +478,7 @@ export default function StudentsPage() {
                          {showSortPanel && (
                             <>
                                 <div className="fixed inset-0 z-20" onClick={() => setShowSortPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-56 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200">
                                     <div className="p-1 space-y-0.5">
                                         {[
                                             { label: 'Admission Date', key: 'admission_date' },
@@ -490,7 +487,7 @@ export default function StudentsPage() {
                                              <button
                                                 key={opt.key}
                                                 onClick={() => handleSort(opt.key)}
-                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left"
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
                                             >
                                                 <span>{opt.label}</span>
                                                 {sortConfig?.key === opt.key && (
@@ -518,16 +515,16 @@ export default function StudentsPage() {
                          {showColumnPanel && (
                             <>
                                 <div className="fixed inset-0 z-20" onClick={() => setShowColumnPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-64 bg-[#18181b] border border-zinc-800 rounded-xl shadow-2xl z-30 p-1 text-zinc-300 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                                      <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1 space-y-0.5">
                                         {ALL_COLUMNS.map(col => (
                                             <button
                                                 key={col.key}
                                                 onClick={() => toggleColumn(col.key)}
-                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-sm text-left group"
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left group font-bold"
                                             >
-                                                <span className={`${visibleColumns.includes(col.key) ? 'text-zinc-200' : 'text-zinc-500'}`}>{col.label}</span>
-                                                {visibleColumns.includes(col.key) && <Check size={14} className="text-white" />}
+                                                <span className={`${visibleColumns.includes(col.key) ? 'text-slate-800' : 'text-slate-400'}`}>{col.label}</span>
+                                                {visibleColumns.includes(col.key) && <Check size={14} className="text-indigo-600" />}
                                             </button>
                                         ))}
                                     </div>
@@ -536,24 +533,50 @@ export default function StudentsPage() {
                          )}
                     </div>
 
-                    {/* Admission Button */}
-                    <button
-                        onClick={() => router.push('/admin/students/add')}
-                        className="ml-2 flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200/50"
-                    >
-                        <UserPlus size={18} />
-                        <span>Admission</span>
-                    </button>
-
-                    {/* Export Button */}
-                    <button
-                        onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-full text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50"
-                        title="Export CSV"
-                    >
-                        <Download size={18} />
-                    </button>
-
+                    {/* Selection Actions */}
+                    {selectedStudents.size > 0 && (
+                        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                            <div className="w-px h-6 bg-slate-200 mx-1" />
+                            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">
+                                {selectedStudents.size === filteredAndSortedStudents.length ? "All items selected" : `${selectedStudents.size} items selected`}
+                            </span>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => { setShowBulkActions(!showBulkActions); setShowFilterPanel(false); setShowSortPanel(false); setShowColumnPanel(false); }}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
+                                >
+                                    <span>Selected Actions</span>
+                                    <ChevronDown size={16} className={`transition-transform duration-200 ${showBulkActions ? 'rotate-180' : ''}`} />
+                                </button>
+                                {showBulkActions && (
+                                    <>
+                                        <div className="fixed inset-0 z-20" onClick={() => setShowBulkActions(false)} />
+                                        <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="p-1">
+                                                <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">
+                                                    {selectedStudents.size} selected
+                                                </div>
+                                                <button
+                                                    onClick={() => { handleBulkDelete(); setShowBulkActions(false); }}
+                                                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors text-sm text-left font-black"
+                                                >
+                                                    <Trash2 size={14} />
+                                                    <span>Delete Selected</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => { setSelectedStudents(new Set()); setShowBulkActions(false); }}
+                                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold text-slate-400"
+                                                >
+                                                    <X size={14} />
+                                                    <span>Clear selection</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -818,6 +841,16 @@ export default function StudentsPage() {
                     onClose={() => setShowInsuranceModal(false)}
                     studentId={selectedStudentId}
                     onSuccess={() => setShowInsuranceModal(false)}
+                />
+            )}
+
+            {showImportModal && (
+                <ImportStudentModal 
+                    isOpen={showImportModal}
+                    onClose={() => setShowImportModal(false)}
+                    onSuccess={() => {
+                        // Success handling - list will auto-refresh via subscription
+                    }}
                 />
             )}
         </div>

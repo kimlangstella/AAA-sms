@@ -120,15 +120,14 @@ export default function InsurancePage() {
       {/* Filter & Search Bar */}
       <div className="flex flex-col sm:flex-row gap-6 items-center justify-between bg-transparent">
          {/* Custom Rounded Search UI */}
-         <div className="flex items-center w-full sm:w-80 px-3 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm focus-within:ring-4 focus-within:ring-indigo-100 focus-within:border-indigo-500 transition-all">
-            <Search size={14} className="text-slate-400" />
-            <div className="w-px h-3 mx-2 bg-slate-200" />
+         <div className="relative w-full md:w-[310px]">
             <input 
                 placeholder="Search..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-slate-700 placeholder:text-slate-400 p-0" 
+                className="w-full pl-6 pr-12 py-3 bg-white border border-slate-200 rounded-full font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm" 
             />
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
          </div>
 
          {/* Filter Tabs */}
