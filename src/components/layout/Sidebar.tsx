@@ -60,7 +60,7 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
       {/* Sidebar Container */}
       <aside 
          className={`
-            fixed inset-y-0 left-0 z-50 bg-[#ffffff] border-r border-slate-100 shadow-sm 
+            fixed inset-y-0 left-0 z-50 bg-white/80 backdrop-blur-xl border-r border-slate-200/50 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] 
             transition-all duration-300 ease-in-out md:translate-x-0
             ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             ${isCollapsed ? 'md:w-24' : 'md:w-72 w-72'}
@@ -91,18 +91,17 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
             {/* Dashboard - Single Link */}
             <Link 
                 href="/admin/dashboard"
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between p-3'} rounded-lg transition-colors duration-200 group mb-1 relative overflow-hidden
-                    ${activeGroup === 'Dashboard' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between p-3'} rounded-2xl transition-all duration-300 group mb-1 relative overflow-hidden
+                    ${activeGroup === 'Dashboard' ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
                 onClick={() => setActiveGroup("Dashboard")}
                 title={isCollapsed ? "Dashboard" : ""}
             >
-                 {activeGroup === 'Dashboard' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-r-full" />}
                  <div className={`flex items-center gap-3 relative z-10 ${isCollapsed ? 'justify-center' : ''}`}>
-                    <span className={`transition-colors duration-200 ${activeGroup === 'Dashboard' ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                    <span className={`transition-colors duration-200 ${activeGroup === 'Dashboard' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`}>
                         <LayoutDashboard size={20} />
                     </span>
-                    {!isCollapsed && <span className="text-sm">Dashboard</span>}
+                    {!isCollapsed && <span className="text-sm font-bold">Dashboard</span>}
                 </div>
             </Link>
 
@@ -159,7 +158,6 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 items={[
                     { label: "Branch Setup", href: "/admin/setup?tab=branches" },
                     { label: "Program Setup", href: "/admin/setup?tab=programs" },
-                    { label: "Import Data", href: "/admin/import" },
                 ]}
             />
 
@@ -235,22 +233,20 @@ function NavItem({ title, icon, items, activeGroup, setActiveGroup, isCollapsed 
         <div className="mb-1 relative group/navitem">
             <button 
                 onClick={handleClick}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between p-3'} rounded-lg transition-colors duration-200 group relative overflow-hidden
-                    ${isActive ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between p-3'} rounded-2xl transition-all duration-300 group relative overflow-hidden
+                    ${isActive ? 'bg-indigo-50/50 text-indigo-700 font-bold border border-indigo-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
                 title={isCollapsed ? title : ""}
             >
-                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-r-full" />}
-                
                 <div className={`flex items-center gap-3 relative z-10 ${isCollapsed ? 'justify-center' : ''}`}>
-                    <span className={`transition-colors duration-200 ${isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                    <span className={`transition-all duration-300 ${isActive ? 'text-indigo-600 rotate-3' : 'text-slate-400 group-hover:text-slate-600'}`}>
                         {icon}
                     </span>
                     {!isCollapsed && <span className="text-sm">{title}</span>}
                 </div>
                 {!isCollapsed && (
-                    <span className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                        <ChevronDown size={16} />
+                    <span className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-indigo-500' : ''}`}>
+                        <ChevronDown size={14} />
                     </span>
                 )}
             </button>

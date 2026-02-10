@@ -96,15 +96,25 @@ function SetupContent() {
   const hasBranches = branches.length > 0;
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 pb-20">
+    <div className="max-w-[1800px] mx-auto space-y-8 pb-20 px-4 xl:px-0">
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 md:px-0">
-          <div>
-              <h1 className="text-4xl font-black text-slate-800 tracking-tighter">Academic Setup</h1>
-              <p className="text-slate-500 font-medium mt-2 text-lg">Configure your school's structural entities.</p>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-4">
+          <div className="flex items-center gap-6">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 animate-in zoom-in-95 duration-500">
+                  <Settings size={24} />
+              </div>
+              <div>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">System Configuration</h1>
+                  <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Academic Architecture</span>
+                      <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Global Setup</span>
+                  </div>
+              </div>
           </div>
-          <div className="flex glass p-1.5 rounded-2xl shadow-sm">
+          
+          <div className="bg-white/60 backdrop-blur-md p-1.5 rounded-[1.5rem] flex items-center shadow-sm border border-slate-200/50 w-full lg:w-auto overflow-x-auto custom-scrollbar">
              <TabButton 
                 active={activeTab === 'branches'} 
                 onClick={() => handleTabChange('branches')} 
@@ -122,7 +132,7 @@ function SetupContent() {
                 active={activeTab === 'identity'} 
                 onClick={() => handleTabChange('identity')} 
                 icon={<Landmark size={18} />} 
-                label="School" 
+                label="School Identity" 
              />
           </div>
       </div>
@@ -195,12 +205,12 @@ function TabButton({ active, onClick, icon, label, disabled }: any) {
         <button 
             onClick={onClick}
             disabled={disabled}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+            className={`flex items-center gap-3 px-6 py-3.5 rounded-[1.125rem] font-black text-[11px] uppercase tracking-widest transition-all whitespace-nowrap ${
                 active 
-                ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' 
                 : disabled 
-                ? 'text-slate-300 cursor-not-allowed'
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                ? 'text-slate-300 cursor-not-allowed opacity-50'
+                : 'text-slate-500 hover:text-indigo-600 hover:bg-white'
             }`}
         >
             {icon}
@@ -228,20 +238,25 @@ function SetupRequired({ message, action }: { message: string, action: () => voi
 
 function BranchList({ branches, enrollments, onAdd }: any) {
     return (
-        <div className="glass-panel overflow-hidden">
-             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
-                <div>
-                     <h2 className="text-xl font-bold text-slate-800">Branch Campuses</h2>
-                     <p className="text-slate-400 text-sm font-medium">Manage your physical locations.</p>
+        <div className="bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/50 shadow-sm overflow-hidden">
+             <div className="px-8 py-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between bg-white gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <Building2 size={24} />
+                    </div>
+                    <div>
+                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Branch Campuses</h2>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Institutional Locations</p>
+                    </div>
                 </div>
-                <button onClick={onAdd} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
-                    <Plus size={18} />
-                    <span>New Branch</span>
+                <button onClick={onAdd} className="flex items-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 w-full sm:w-auto justify-center active:scale-95">
+                    <Plus size={20} />
+                    <span>Create Branch</span>
                 </button>
             </div>
             
-            <div className="overflow-x-auto">
-                 <table className="w-full text-left">
+            <div className="overflow-x-auto custom-scrollbar">
+                 <table className="w-full text-left min-w-[800px]">
                      <thead>
                          <tr className="bg-slate-50/50 border-b border-slate-100">
                              <th className="px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Name</th>
@@ -302,7 +317,7 @@ function ProgramList({ classes, enrollments, onAdd, onEdit, onDelete }: any) {
                 </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 bg-slate-50/30">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-8 bg-slate-50/30">
                  {programs.length === 0 ? (
                       <div className="col-span-full py-12 text-center text-slate-400 font-medium">No programs found. Create one to get started.</div>
                  ) : programs.map(p => (
@@ -388,7 +403,7 @@ function ProgramForm({ branches, initialData, onCancel, lastSelectedBranch, setL
             onSubmit={handleSubmit} 
             submitLabel={submitting ? (<Loader2 className="animate-spin" />) : (initialData ? "Update" : "Create")}
         >
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                  <div className="space-y-2">
                      <label className="text-xs font-bold text-slate-500 ml-1 uppercase">Branch Name</label>
                      <select 
@@ -497,10 +512,10 @@ function SchoolSettingsForm({ school }: any) {
                                 <InputGroup label="Website URL" name="website" defaultValue={school?.website} />
                            </div>
                            
-                           <InputGroup label="Name of Institute" name="school_name" defaultValue={school?.school_name} required className="md:col-span-1" />
-                           <InputGroup label="Address" name="address" defaultValue={school?.address} required className="md:col-span-1" />
+                           <InputGroup label="Name of Institute" name="school_name" defaultValue={school?.school_name} required className="sm:col-span-1" />
+                           <InputGroup label="Address" name="address" defaultValue={school?.address} required className="sm:col-span-1" />
                            
-                           <InputGroup label="Institutional Email" name="email" defaultValue={school?.email} required className="md:col-span-2" />
+                           <InputGroup label="Institutional Email" name="email" defaultValue={school?.email} required className="sm:col-span-2" />
                       </div>
                       
                       <div className="flex justify-end pt-2">
@@ -593,7 +608,7 @@ function CreateBranchForm({ school, onCancel }: any) {
 
 function CardForm({ title, children, onCancel, onSubmit, submitLabel = "Create" }: any) {
     return (
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 md:p-12 animate-in zoom-in-95 duration-300 relative">
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-6 sm:p-8 md:p-12 animate-in zoom-in-95 duration-300 relative">
              <button 
                 onClick={onCancel}
                 className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"

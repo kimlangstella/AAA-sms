@@ -34,7 +34,15 @@ import {
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { termService } from "@/services/termService";
-import { addStudent, uploadImage, getClasses, addEnrollment, subscribeToSchoolDetails } from "@/lib/services/schoolService";
+import { 
+  addStudent, 
+  uploadImage, 
+  getClasses, 
+  addEnrollment, 
+  subscribeToSchoolDetails,
+  checkPhoneDuplicate,
+  getLastSessionForClass
+} from "@/lib/services/schoolService";
 import { Branch, Class, PaymentType, School as SchoolType, Term } from "@/lib/types";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -103,6 +111,39 @@ export default function AddStudentPage() {
       admission_date: new Date().toISOString().split('T')[0]
   });
 
+  const [terms, setTerms] = useState<Term[]>([]);
+
+  useEffect(() => {
+    const unsub = branchService.subscribe(setBranches);
+    const unsubTerms = termService.subscribe((fetchedTerms) => {
+        setTerms(fetchedTerms);
+        // Auto-set Payment Due Date to Active Term's End Date
+        const active = fetchedTerms.find(t => t.status === 'Active');
+        if (active && active.end_date) {
+            setFormData(prev => ({ ...prev, payment_due_date: active.end_date }));
+        }
+    });
+    return () => { unsub(); unsubTerms(); };
+  }, []);
+
+  // Auto-fetch Session Start when Class ID changes
+  useEffect(() => {
+      const fetchSession = async () => {
+          if (newProgramData.class_id) {
+              const activeTerm = terms.find(t => t.status === 'Active');
+              // If we have an active term, try to find the last session
+              const lastSession = await getLastSessionForClass(newProgramData.class_id, activeTerm?.term_id);
+              
+              // If lastSession is 0, start at 1. If 5, start at 6.
+              const nextSession = lastSession + 1;
+              setNewProgramData(prev => ({ ...prev, start_session: nextSession.toString() }));
+          } else {
+              setNewProgramData(prev => ({ ...prev, start_session: "1" }));
+          }
+      };
+      fetchSession();
+  }, [newProgramData.class_id, terms]);
+
   // Image State
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -112,7 +153,8 @@ export default function AddStudentPage() {
       isChecking: boolean;
       exists: boolean;
       message: string;
-  }>({ isChecking: false, exists: false, message: "" });
+      type: 'name' | 'phone';
+  }>({ isChecking: false, exists: false, message: "", type: 'name' });
 
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
@@ -136,13 +178,9 @@ export default function AddStudentPage() {
     documentTitle: createdStudent ? `Invoice-${createdStudent.student_code}` : 'Invoice',
   });
 
-  const [terms, setTerms] = useState<Term[]>([]);
+  // Discount State (Percentage Only)
+  const [discountInput, setDiscountInput] = useState("0");
 
-  useEffect(() => {
-    const unsub = branchService.subscribe(setBranches);
-    const unsubTerms = termService.subscribe(setTerms);
-    return () => { unsub(); unsubTerms(); };
-  }, []);
 
   // Fetch classes and programs when branch changes
   useEffect(() => {
@@ -167,12 +205,32 @@ export default function AddStudentPage() {
     setFormData(prev => ({ 
         ...prev, 
         total_amount: total.toString(),
-        // Default to Unpaid (0) or keep previous logic? 
-        // Let's NOT auto-update paid_amount here to avoid overwriting user input if they go back/forth.
     }));
   }, [selectedPrograms]);
-  
+
+  // Recalculate Discount Amount when Total or Input (Percentage) changes
+  useEffect(() => {
+      const total = Number(formData.total_amount) || 0;
+      const inputPercent = Number(discountInput) || 0;
+      
+      // Calculate amount based on percentage
+      const calculatedDiscount = total * (inputPercent / 100);
+
+      // Update formData.discount (actual dollar amount), fixed to 2 decimals
+      setFormData(prev => ({ ...prev, discount: calculatedDiscount.toFixed(2) }));
+  }, [formData.total_amount, discountInput]);
+
   const [paymentStatusOption, setPaymentStatusOption] = useState<'Paid' | 'Unpaid'>('Unpaid');
+
+  // Auto-update Paid Amount when Total or Discount changes (if Paid)
+  useEffect(() => {
+      if (paymentStatusOption === 'Paid') {
+            const total = Number(formData.total_amount) || 0;
+            const discount = Number(formData.discount) || 0;
+            const toPay = Math.max(0, total - discount);
+            setFormData(prev => ({ ...prev, paid_amount: toPay.toFixed(2) }));
+      }
+  }, [formData.total_amount, formData.discount, paymentStatusOption]);
 
   const handlePaymentStatusChange = (status: 'Paid' | 'Unpaid') => {
       setPaymentStatusOption(status);
@@ -195,7 +253,13 @@ export default function AddStudentPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { name, value } = e.target;
+      let { name, value } = e.target;
+      
+      // Numeric-only restriction for phone fields
+      if (name === 'phone' || name === 'parent_phone') {
+          value = value.replace(/\D/g, ''); // Keep only digits
+      }
+
       setFormData(prev => ({ ...prev, [name]: value }));
       
       // Clear error when typing
@@ -220,7 +284,7 @@ export default function AddStudentPage() {
     if (program && cls) {
         // Calculate Fee
         const startSession = parseInt(newProgramData.start_session) || 1;
-        const totalSessions = cls.totalSessions || 12; // Default 12 if not set
+        const totalSessions = cls.totalSessions || 11; // Default 11 if not set
         const remainingSessions = Math.max(0, totalSessions - startSession + 1);
         
         // Fee Logic:
@@ -348,28 +412,43 @@ export default function AddStudentPage() {
       // Step 1: Check for duplicates before proceeding to Enrollment
       if (currentStep === 1) {
           const studentName = `${formData.first_name} ${formData.last_name}`.trim();
-          if (studentName) {
-            try {
-                // Check if user is trying to bypass warning
-                // Note: If we want to strictly force check every time, we do this.
-                // If user already saw modal and clicked "Continue Anyway", we need a way to bypass this check.
-                // However, "Continue Anyway" sets currentStep to 2 directly, so it won't hit this logic again for Step 1 -> 2 transition.
-                
-                const duplicateQuery = query(
-                    collection(db, "students"),
-                    where("student_name", "==", studentName)
-                );
+          
+          try {
+              // 1. Check Name Duplicate
+              const nameQuery = query(collection(db, "students"), where("student_name", "==", studentName));
+              const nameSnap = await getDocs(nameQuery);
+              
+              if (!nameSnap.empty) {
+                  const duplicates = nameSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                  setDuplicateStudents(duplicates);
+                  setDuplicateCheck(prev => ({ ...prev, type: 'name' }));
+                  setShowDuplicateModal(true);
+                  return;
+              }
 
-                const duplicateSnap = await getDocs(duplicateQuery);
-                if (!duplicateSnap.empty) {
-                    const duplicates = duplicateSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setDuplicateStudents(duplicates);
-                    setShowDuplicateModal(true);
-                    return; // Stop here
-                }
-            } catch (error) {
-                console.error("Error checking duplicates:", error);
-            }
+              // 2. Check Phone Duplicate (Student Phone)
+              if (formData.phone) {
+                  const phoneDupes = await checkPhoneDuplicate(formData.phone);
+                  if (phoneDupes.length > 0) {
+                      setDuplicateStudents(phoneDupes);
+                      setDuplicateCheck(prev => ({ ...prev, type: 'phone', message: `Phone number ${formData.phone} is already registered.` }));
+                      setShowDuplicateModal(true);
+                      return;
+                  }
+              }
+
+              // 3. Check Parent Phone Duplicate
+              if (formData.parent_phone) {
+                  const parentPhoneDupes = await checkPhoneDuplicate(formData.parent_phone);
+                  if (parentPhoneDupes.length > 0) {
+                      setDuplicateStudents(parentPhoneDupes);
+                      setDuplicateCheck(prev => ({ ...prev, type: 'phone', message: `Parent contact ${formData.parent_phone} is already registered.` }));
+                      setShowDuplicateModal(true);
+                      return;
+                  }
+              }
+          } catch (error) {
+              console.error("Error checking duplicates:", error);
           }
       }
 
@@ -391,19 +470,39 @@ export default function AddStudentPage() {
           // 0. Check for duplicates (only if not already confirmed)
           const studentName = `${formData.first_name} ${formData.last_name}`.trim();
           
-          // Simple normalization for check
-          const duplicateQuery = query(
-              collection(db, "students"), 
-              where("student_name", "==", studentName)
-          );
-          
-          const duplicateSnap = await getDocs(duplicateQuery);
-          if (!duplicateSnap.empty) {
-              const duplicates = duplicateSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              setDuplicateStudents(duplicates);
+          // Check Name
+          const nameQuery = query(collection(db, "students"), where("student_name", "==", studentName));
+          const nameSnap = await getDocs(nameQuery);
+          if (!nameSnap.empty) {
+              setDuplicateStudents(nameSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+              setDuplicateCheck(prev => ({ ...prev, type: 'name' }));
               setShowDuplicateModal(true);
               setSubmitting(false);
               return;
+          }
+
+          // Check Student Phone
+          if (formData.phone) {
+              const phoneDupes = await checkPhoneDuplicate(formData.phone);
+              if (phoneDupes.length > 0) {
+                  setDuplicateStudents(phoneDupes);
+                  setDuplicateCheck(prev => ({ ...prev, type: 'phone', message: `Phone number ${formData.phone} is already registered.` }));
+                  setShowDuplicateModal(true);
+                  setSubmitting(false);
+                  return;
+              }
+          }
+
+          // Check Parent Phone
+          if (formData.parent_phone) {
+              const parentPhoneDupes = await checkPhoneDuplicate(formData.parent_phone);
+              if (parentPhoneDupes.length > 0) {
+                  setDuplicateStudents(parentPhoneDupes);
+                  setDuplicateCheck(prev => ({ ...prev, type: 'phone', message: `Parent contact ${formData.parent_phone} is already registered.` }));
+                  setShowDuplicateModal(true);
+                  setSubmitting(false);
+                  return;
+              }
           }
 
           await createStudent();
@@ -456,46 +555,150 @@ export default function AddStudentPage() {
 
 
 
-
           // Distribute paid amount across programs (if multiple)
           // If Skip Payment, we force remainingPaid to 0.
           let remainingPaid = Number(formData.paid_amount);
 
+          // Get Discount Percentage (Global)
+          const discountPercent = Number(discountInput) || 0;
+
+          // Find the active term
+          const activeTerm = terms.find(t => t.status === 'Active');
+          
+          // Find next term (simple date-based check)
+          const nextTerm = activeTerm 
+              ? terms
+                  .filter(t => t.start_date > activeTerm.start_date)
+                  .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
+              : undefined;
+
           for (const prog of selectedPrograms) {
-               const price = Number(prog.price);
-               const amountAllocated = Math.min(remainingPaid, price);
-               remainingPaid -= amountAllocated;
-
-               // Find the active term
-               const activeTerm = terms.find(t => t.status === 'Active');
+               // Base Price logic (Total for this program selection)
+               // Note: prog.price already includes next term fee if selected (calculated in handleAddProgram)
+               const fullPrice = Number(prog.price);
                
-               const enrollmentPayload = {
-                  student_id: newStudent.id,
-                  class_id: prog.class_id,
-                  total_amount: price,
-                  discount: 0, 
-                  paid_amount: amountAllocated, 
-                  payment_status: amountAllocated >= price ? 'Paid' : 'Unpaid', 
-                  payment_type: formData.payment_type,
-                  enrollment_status: 'Active',
+               // Check if splitting is needed
+               if (prog.include_next_term && activeTerm && nextTerm) {
+                   // SPLIT ENROLLMENT: 1. Current Term partial, 2. Next Term full
+                   
+                   // Re-calculate individual fees
+                   // We need to adhere to how handleAddProgram calculated it to reverse it correctly
+                   // Logic was: calculatedPrice = (feePerSession * remainingSessions) + (includeNext ? program.price : 0)
+                   
+                   const originalProgram = programs.find(p => p.id === prog.program_id);
+                   const baseProgramPrice = Number(originalProgram?.price || 0); // Full term price
+                   
+                   const nextTermFee = baseProgramPrice;
+                   const currentTermFee = fullPrice - nextTermFee;
 
-                  session_fee: Number(prog.price),
-                  start_session: Number(prog.start_session || 1),
-                  include_next_term: prog.include_next_term || false,
-                  term: activeTerm?.term_name || '',
-                  term_id: activeTerm?.term_id || '',
-                  payment_due_date: formData.payment_due_date || "" 
-              };
-              
-              const enrId = await addEnrollment(enrollmentPayload);
-              newEnrollments.push({ 
-                  enrollment_id: enrId, 
-                  ...enrollmentPayload,
-                  program_name: prog.program_name,
-                  class_name: prog.class_name,
-                  total_sessions: prog.total_sessions,
-                  admission_date: prog.admission_date
-              });
+                   // 1. Current Term Enrollment
+                   const discount1 = currentTermFee * (discountPercent / 100);
+                   const netFee1 = currentTermFee - discount1;
+
+                   const amountAllocated1 = Math.min(remainingPaid, netFee1);
+                   remainingPaid = Math.max(0, remainingPaid - amountAllocated1);
+
+                   const enrollmentPayload1 = {
+                      student_id: newStudent.id,
+                      class_id: prog.class_id,
+                      total_amount: currentTermFee,
+                      discount: discount1, 
+                      paid_amount: amountAllocated1, 
+                      payment_status: (amountAllocated1 >= netFee1 - 0.01) ? 'Paid' : 'Unpaid', // Tolerance for float
+                      payment_type: formData.payment_type,
+                      enrollment_status: 'Active',
+
+                      session_fee: Number(originalProgram?.session_fee || (baseProgramPrice / (prog.total_sessions || 1))),
+                      start_session: Number(prog.start_session || 1),
+                      include_next_term: false, // Handled by separate enrollment
+                      term: activeTerm.term_name || '',
+                      term_id: activeTerm.term_id || '',
+                      payment_due_date: formData.payment_due_date || "" 
+                  };
+                  
+                  const enrId1 = await addEnrollment(enrollmentPayload1 as any);
+                  newEnrollments.push({ 
+                      enrollment_id: enrId1, 
+                      ...enrollmentPayload1,
+                      program_name: prog.program_name,
+                      class_name: prog.class_name,
+                      total_sessions: prog.total_sessions,
+                      admission_date: prog.admission_date
+                  });
+
+                  // 2. Next Term Enrollment
+                  const discount2 = nextTermFee * (discountPercent / 100);
+                  const netFee2 = nextTermFee - discount2;
+
+                  const amountAllocated2 = Math.min(remainingPaid, netFee2);
+                  remainingPaid = Math.max(0, remainingPaid - amountAllocated2);
+
+                  const enrollmentPayload2 = {
+                      student_id: newStudent.id,
+                      class_id: prog.class_id,
+                      total_amount: nextTermFee,
+                      discount: discount2,
+                      paid_amount: amountAllocated2,
+                      payment_status: (amountAllocated2 >= netFee2 - 0.01) ? 'Paid' : 'Unpaid',
+                      payment_type: formData.payment_type,
+                      enrollment_status: 'Active', // Or 'Upcoming'? User said "student will have attendance in next term also", usually means Active in that term context.
+                      
+                      session_fee: Number(originalProgram?.session_fee || (baseProgramPrice / (prog.total_sessions || 1))),
+                      start_session: 1, // Next term starts at 1
+                      include_next_term: false,
+                      term: nextTerm.term_name || '',
+                      term_id: nextTerm.term_id || '',
+                      payment_due_date: formData.payment_due_date || ""
+                  };
+
+                  const enrId2 = await addEnrollment(enrollmentPayload2 as any);
+                  newEnrollments.push({
+                      enrollment_id: enrId2,
+                      ...enrollmentPayload2,
+                      program_name: prog.program_name,
+                      class_name: prog.class_name,
+                      total_sessions: prog.total_sessions,
+                      admission_date: prog.admission_date
+                  });
+
+
+               } else {
+                   // STANDARD SINGLE ENROLLMENT
+                   // Calculate item discount
+                   const discount = fullPrice * (discountPercent / 100);
+                   const netFee = fullPrice - discount;
+
+                   const amountAllocated = Math.min(remainingPaid, netFee);
+                   remainingPaid = Math.max(0, remainingPaid - amountAllocated);
+
+                   const enrollmentPayload = {
+                      student_id: newStudent.id,
+                      class_id: prog.class_id,
+                      total_amount: fullPrice,
+                      discount: discount, 
+                      paid_amount: amountAllocated, 
+                      payment_status: (amountAllocated >= netFee - 0.01) ? 'Paid' : 'Unpaid', 
+                      payment_type: formData.payment_type,
+                      enrollment_status: 'Active',
+
+                      session_fee: Number(prog.price), // Approx
+                      start_session: Number(prog.start_session || 1),
+                      include_next_term: prog.include_next_term || false,
+                      term: activeTerm?.term_name || '',
+                      term_id: activeTerm?.term_id || '',
+                      payment_due_date: formData.payment_due_date || "" 
+                  };
+                  
+                  const enrId = await addEnrollment(enrollmentPayload);
+                  newEnrollments.push({ 
+                      enrollment_id: enrId, 
+                      ...enrollmentPayload,
+                      program_name: prog.program_name,
+                      class_name: prog.class_name,
+                      total_sessions: prog.total_sessions,
+                      admission_date: prog.admission_date
+                  });
+               }
           }
 
           // Success! Move to Step 4 (Invoice)
@@ -541,7 +744,7 @@ export default function AddStudentPage() {
   };
 
   return (
-    <div className="max-w-[70rem] mx-auto space-y-6 pb-24 px-4 font-sans relative">
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-24 px-4 font-sans relative">
         
         {/* Header */}
         <div className="flex items-center gap-4 py-6">
@@ -599,7 +802,7 @@ export default function AddStudentPage() {
 
                                 {/* Student Fields */}
                                 <div className="md:col-span-9 space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                                         <Input label="First Name" name="first_name" value={formData.first_name} onChange={handleInputChange} required />
                                         <Input label="Last Name" name="last_name" value={formData.last_name} onChange={handleInputChange} required />
                                         
@@ -643,13 +846,11 @@ export default function AddStudentPage() {
                                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
                                             <div className="w-full border-t border-slate-100"></div>
                                         </div>
-                                        <div className="relative flex justify-start">
-                                            <span className="pr-4 bg-white text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Guardian Details</span>
-                                        </div>
+                                     
                                     </div>
 
                                     {/* Guardian Fields */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                                         <Input label="Father's Name" name="father_name" value={formData.father_name} onChange={handleInputChange} />
                                         <Input label="Mother's Name" name="mother_name" value={formData.mother_name} onChange={handleInputChange} />
                                         <Input label="Contact Number" name="parent_phone" value={formData.parent_phone} onChange={handleInputChange} required icon={<Phone size={16} />} error={validationErrors.parent_phone} />
@@ -750,12 +951,36 @@ export default function AddStudentPage() {
                              <span className="text-2xl font-black">${formData.total_amount || '0.00'}</span>
                          </div>
                          
-                         <div className="grid grid-cols-2 gap-6">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <Input label="Total Amount ($)" name="total_amount" type="number" value={formData.total_amount} onChange={handleInputChange} required />
-                            <Input label="Discount ($)" name="discount" type="number" value={formData.discount} onChange={handleInputChange} />
+                            
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center justify-between">
+                                    <span>Discount (Percentage)</span>
+                                </label>
+                                <div className="relative">
+                                     <input 
+                                        type="number" 
+                                        value={discountInput}
+                                        onChange={(e) => setDiscountInput(e.target.value)}
+                                        className="w-full px-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-semibold text-sm text-slate-700 placeholder:text-slate-300 shadow-sm"
+                                        placeholder="e.g. 10"
+                                        min="0"
+                                        max="100"
+                                     />
+                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                                         <span className="text-slate-400 font-bold text-lg">%</span>
+                                         {Number(formData.discount) > 0 && (
+                                            <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-md">
+                                                -${Number(formData.discount).toFixed(2)}
+                                            </span>
+                                         )}
+                                     </div>
+                                </div>
+                            </div>
                          </div>
 
-                         <div className="grid grid-cols-2 gap-6">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                              {/* Payment Status Toggle */}
                              <div className="space-y-2">
                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Payment Status</label>
@@ -779,7 +1004,7 @@ export default function AddStudentPage() {
                              </Select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <Input label="Amount Paid ($)" name="paid_amount" type="number" value={formData.paid_amount} onChange={(e: any) => {
                                 handleInputChange(e);
                                 // Removed auto-switch to Partial
@@ -795,12 +1020,7 @@ export default function AddStudentPage() {
                              />
                         </div>
                         
-                        <div className="flex items-center gap-2 mt-2">
-                             <div className="w-1 h-1 rounded-full bg-amber-500"></div>
-                             <p className="text-[10px] text-amber-600 font-bold">
-                                System will mark student as "Unpaid" automatically after the due date.
-                             </p>
-                        </div>
+
                     </div>
                 </div>
             )}
@@ -828,10 +1048,11 @@ export default function AddStudentPage() {
                     {/* Invoice Paper Preview */}
                     <div ref={invoiceRef} className="bg-white p-12 rounded-[24px] shadow-sm border border-slate-100 print:shadow-none print:border-none print:p-8">
                         
-                         {/* Invoice Header */}
-                        <div className="flex justify-between items-start mb-12 border-b border-slate-100 pb-8">
+
+                        {/* Header & School Info */}
+                        <div className="flex justify-between items-start mb-8 pb-8 border-b border-slate-100 print:border-slate-300">
                             <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm print:border-slate-300">
+                                <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm print:border-slate-300">
                                     {school?.logo_url ? (
                                         <img src={school.logo_url} alt="Logo" className="w-full h-full object-contain" />
                                     ) : (
@@ -839,71 +1060,84 @@ export default function AddStudentPage() {
                                     )}
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-black text-slate-800 tracking-tight">{school?.school_name || "Authentic Advanced Academy"}</h1>
-                                    <div className="text-xs font-medium text-slate-400 mt-1 space-y-0.5">
-                                        <p className="flex items-center gap-1"><MapPin size={12} /> {school?.address || "1st Floor, Boeung Snor Food Village"}</p>
-                                        <p className="flex items-center gap-1"><Phone size={12} /> {(school as any)?.phone || "089 284 3984"}</p>
+                                    <h1 className="text-xl font-black text-slate-800 tracking-tight">{school?.school_name || "Authentic Advanced Academy"}</h1>
+                                    <div className="text-xs font-medium text-slate-500 mt-1 space-y-0.5">
+                                        <p className="flex items-center gap-1.5"><MapPin size={11} /> {school?.address || "1st Floor, Boeung Snor Food Village"}</p>
+                                        <p className="flex items-center gap-1.5"><Phone size={11} /> {(school as any)?.phone || "089 284 3984"}</p>
                                     </div>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <h2 className="text-4xl font-black text-slate-200 tracking-tighter uppercase print:text-slate-400">Invoice</h2>
-                                <p className="font-mono text-sm font-bold text-slate-500 mt-2">#{Math.floor(Math.random() * 100000).toString().padStart(6, '0')}</p>
-                                <p className="text-sm font-medium text-slate-400 mt-1">{new Date().toLocaleDateString()}</p>
+                                <h2 className="text-3xl font-black text-slate-200 tracking-tighter uppercase print:text-slate-400">Receipt</h2>
+                                <div className="mt-1 space-y-0.5">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Receipt No</p>
+                                    <p className="font-mono text-sm font-bold text-slate-700">#{Math.floor(Math.random() * 100000).toString().padStart(6, '0')}</p>
+                                </div>
+                                <div className="mt-2 space-y-0.5">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</p>
+                                    <p className="font-mono text-sm font-bold text-slate-700">{new Date().toLocaleDateString()}</p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Bill To */}
-                        <div className="flex justify-between mb-12">
+                        {/* Student Info & Details */}
+                        <div className="grid grid-cols-2 gap-12 mb-10">
                             <div>
-                                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Bill To</p>
-                                <h3 className="text-xl font-bold text-slate-800">{createdStudent.first_name} {createdStudent.last_name}</h3>
-                                <p className="text-sm font-medium text-slate-500 mt-1">ID: {createdStudent.student_code}</p>
-                                <p className="text-sm font-medium text-slate-500">{createdStudent.phone}</p>
-                                <p className="text-sm font-medium text-slate-500">{createdStudent.address}</p>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-3">Bill To</p>
+                                <h3 className="text-lg font-bold text-slate-800 mb-1">{createdStudent.first_name} {createdStudent.last_name}</h3>
+                                <div className="space-y-1 text-sm text-slate-500 font-medium">
+                                    <p>ID: <span className="text-slate-700 font-bold">{createdStudent.student_code}</span></p>
+                                    <p>Gender: <span className="text-slate-700">{createdStudent.gender}</span></p>
+                                    <p>Branch: <span className="text-slate-700">{createdStudent.branch_name}</span></p>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 print:bg-white print:border-slate-200 flex flex-col justify-center">
+                                <div className="grid grid-cols-3 gap-4 text-center">
+                                    <div className="space-y-1">
+                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Term</p>
+                                         <p className="text-sm font-bold text-slate-800">
+                                            {[...new Set(createdEnrollments.map(e => e.term))].join(', ')}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1 border-x border-slate-200 print:border-slate-200/50">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Method</p>
+                                        <p className="text-sm font-bold text-slate-800">{createdEnrollments[0]?.payment_type}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
+                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">
+                                            PAID
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         {/* Table */}
-                        <table className="w-full mb-12">
-                            <thead className="bg-slate-50 border-y border-slate-100 print:bg-slate-100 print:border-slate-300">
-                                <tr>
-                                    <th className="py-3 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Description</th>
-                                    <th className="py-3 px-4 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Session</th>
-                                    <th className="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                        <table className="w-full mb-8 border-collapse">
+                            <thead>
+                                <tr className="border-b-2 border-slate-100">
+                                    <th className="py-3 pr-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Description</th>
+                                    <th className="py-3 px-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-32">Session</th>
+                                    <th className="py-3 pl-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider w-32">Amount</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50 print:divide-slate-200">
+                            <tbody className="divide-y divide-slate-50/50">
                                 {createdEnrollments.map((enr, idx) => (
-                                    <tr key={idx} className="border-b border-slate-50 print:border-slate-100">
-                                        <td className="py-6 px-4">
-                                            <p className="font-bold text-slate-800 text-base">{enr.program_name || "Tuition Fee"}</p>
-                                            <div className="mt-2 space-y-1">
-                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                                                    <School size={12} className="text-slate-400" />
-                                                    {createdStudent.branch_name}
-                                                </p>
-                                                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                                                    <BookOpen size={12} className="text-slate-400" />
-                                                    {enr.class_name}
-                                                </p>
-                                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                                                    <Calendar size={12} className="text-slate-300" />
-                                                    Reg: {new Date(enr.admission_date).toLocaleDateString()}
-                                                </p>
+                                    <tr key={idx}>
+                                        <td className="py-4 pr-4 align-top">
+                                            <p className="font-bold text-slate-800 text-sm">{enr.program_name || "Tuition Fee"}</p>
+                                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 font-medium">
+                                                <span className="flex items-center gap-1.5"><BookOpen size={10} className="text-slate-400" /> {enr.class_name}</span>
                                             </div>
                                         </td>
-                                        <td className="py-6 px-4 text-center">
-                                            <div className="inline-flex flex-col items-center">
-                                                <span className="text-xs font-black text-slate-400 uppercase tracking-tighter mb-1">Sessions</span>
-                                                <span className="font-mono font-bold text-slate-600 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
-                                                    {enr.start_session} - {enr.total_sessions || 12}
-                                                </span>
-                                            </div>
+                                        <td className="py-4 px-4 text-center align-top">
+                                             <span className="font-mono font-bold text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                                {enr.start_session}-{enr.total_sessions || 12}
+                                            </span>
                                         </td>
-                                        <td className="py-6 px-4 text-right">
-                                            <span className="font-black text-slate-800 text-lg">${Number(enr.total_amount).toFixed(2)}</span>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{enr.term}</p>
+                                        <td className="py-4 pl-4 text-right align-top">
+                                            <span className="font-bold text-slate-800 text-sm">${Number(enr.total_amount).toFixed(2)}</span>
                                         </td>
                                     </tr>
                                 ))}
@@ -911,26 +1145,25 @@ export default function AddStudentPage() {
                         </table>
 
                         {/* Totals */}
-                        <div className="flex justify-end border-t border-slate-100 pt-8 print:border-slate-300">
-                            <div className="w-64 space-y-3">
-                                <div className="flex justify-between text-sm font-medium text-slate-500">
-                                    <span>Total Due</span>
+                        <div className="flex justify-end pt-4 border-t-2 border-slate-100 print:border-slate-300">
+                            <div className="w-full max-w-xs space-y-2">
+                                <div className="flex justify-between text-xs font-bold text-slate-500">
+                                    <span>Total Amount</span>
                                     <span>${createdEnrollments.reduce((sum, e) => sum + Number(e.total_amount), 0).toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between text-sm font-medium text-slate-500">
+                                <div className="flex justify-between text-xs font-bold text-emerald-600">
+                                    <span>Discount</span>
+                                    <span>-${createdEnrollments.reduce((sum, e) => sum + Number(e.discount || 0), 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-bold text-slate-500 pb-2 border-b border-slate-100 border-dashed">
                                     <span>Paid Amount</span>
                                     <span>-${createdEnrollments.reduce((sum, e) => sum + Number(e.paid_amount), 0).toFixed(2)}</span>
                                 </div>
-                                <div className="border-t border-slate-100 pt-3 flex justify-between items-center print:border-slate-300">
-                                    <span className="font-black text-slate-800 text-lg">Balance Due</span>
-                                    <span className="font-black text-indigo-600 text-2xl">
-                                        ${(createdEnrollments.reduce((sum, e) => sum + Number(e.total_amount), 0) - createdEnrollments.reduce((sum, e) => sum + Number(e.paid_amount), 0)).toFixed(2)}
-                                    </span>
-                                </div>
+
                             </div>
                         </div>
 
-                         {/* Footer */}
+                        {/* Footer */}
                         <div className="mt-20 pt-8 border-t border-dashed border-slate-200 text-center print:mt-10">
                             <p className="text-slate-400 text-xs font-medium">Thank you for choosing Authentic Advanced Academy!</p>
                         </div>
@@ -939,54 +1172,59 @@ export default function AddStudentPage() {
                     
                 </div>
             )}
-            
+                        
 
             {/* Add Program Dialog/Modal */}
             {isAddingProgram && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden">
-                    <div className="bg-indigo-50/50 p-6 border-b border-indigo-100 flex justify-between items-center">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                                <BookOpen size={20} />
+                <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
+                    <div className="bg-white p-8 border-b border-slate-50 flex justify-between items-center">
+                         <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm border border-indigo-100">
+                                <BookOpen size={24} />
                             </div>
-                            <h3 className="text-lg font-black text-slate-800 tracking-tight">{editingProgramIndex !== null ? 'Edit Program' : 'Add Program'}</h3>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight">{editingProgramIndex !== null ? 'Edit Program' : 'Add Program'}</h3>
+                                <p className="text-sm font-medium text-slate-400">Select program details for enrollment</p>
+                            </div>
                         </div>
-                        <button onClick={() => { setIsAddingProgram(false); setEditingProgramIndex(null); }} className="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-all shadow-sm">
-                            <X size={16} strokeWidth={2.5} />
+                        <button onClick={() => { setIsAddingProgram(false); setEditingProgramIndex(null); }} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-all">
+                            <X size={20} strokeWidth={2.5} />
                         </button>
                     </div>
-                    <div className="p-6 space-y-5">
-                        <Select 
-                            label="Program" 
-                            name="program_id" 
-                            value={newProgramData.program_id} 
-                            onChange={(e: any) => setNewProgramData(prev => ({ ...prev, program_id: e.target.value }))}
-                            required
-                        >
-                            <option value="">Select Program</option>
-                            {programs.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} (${p.price})</option>
-                            ))}
-                        </Select>
 
-                        <Select 
-                            label="Class" 
-                            name="class_id" 
-                            value={newProgramData.class_id} 
-                            onChange={(e: any) => setNewProgramData(prev => ({ ...prev, class_id: e.target.value }))}
-                            required
-                        >
-                            <option value="">Select Class</option>
-                            {classes
-                                .filter(c => !newProgramData.program_id || c.programId === newProgramData.program_id) 
-                                .map(c => (
-                                <option key={c.class_id} value={c.class_id}>{c.className}</option>
-                            ))}
-                        </Select>
+                    <div className="p-8 space-y-6">
+                        <div className="grid grid-cols-1 gap-6">
+                            <Select 
+                                label="Program" 
+                                name="program_id" 
+                                value={newProgramData.program_id} 
+                                onChange={(e: any) => setNewProgramData(prev => ({ ...prev, program_id: e.target.value }))}
+                                required
+                            >
+                                <option value="">Select Program</option>
+                                {programs.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} (${p.price})</option>
+                                ))}
+                            </Select>
 
+                            <Select 
+                                label="Class" 
+                                name="class_id" 
+                                value={newProgramData.class_id} 
+                                onChange={(e: any) => setNewProgramData(prev => ({ ...prev, class_id: e.target.value }))}
+                                required
+                            >
+                                <option value="">Select Class</option>
+                                {classes
+                                    .filter(c => !newProgramData.program_id || c.programId === newProgramData.program_id) 
+                                    .map(c => (
+                                    <option key={c.class_id} value={c.class_id}>{c.className}</option>
+                                ))}
+                            </Select>
+                        </div>
 
-                        <div className="grid grid-cols-2 gap-5">
+                        <div className="grid grid-cols-2 gap-6">
                             <Input 
                                 label="Start Session" 
                                 name="start_session" 
@@ -998,41 +1236,47 @@ export default function AddStudentPage() {
                                 required 
                             />
                             
-                            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 mt-6">
-                                <input 
-                                    type="checkbox" 
-                                    id="includeNextTerm"
-                                    checked={newProgramData.include_next_term || false}
-                                    onChange={(e) => setNewProgramData(prev => ({ ...prev, include_next_term: e.target.checked }))}
-                                    className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                />
-                                <label htmlFor="includeNextTerm" className="text-sm font-bold text-slate-700 cursor-pointer select-none">
-                                    Include Next Term
-                                </label>
+                            <Input 
+                                label="Admission Date" 
+                                name="admission_date" 
+                                type="date" 
+                                value={newProgramData.admission_date} 
+                                onChange={(e: any) => setNewProgramData(prev => ({ ...prev, admission_date: e.target.value }))}
+                                required 
+                            />
+                        </div>
+
+                        {/* Custom Checkbox Card */}
+                        <div 
+                            onClick={() => setNewProgramData(prev => ({ ...prev, include_next_term: !prev.include_next_term }))}
+                            className={`relative cursor-pointer group flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-200 ${newProgramData.include_next_term ? 'border-indigo-500 bg-indigo-50/10' : 'border-slate-100 bg-slate-50 hover:border-indigo-200'}`}
+                        >
+                            <div className={`mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${newProgramData.include_next_term ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-300 group-hover:border-indigo-400'}`}>
+                                {newProgramData.include_next_term && <Check size={14} strokeWidth={3} />}
+                            </div>
+                            <div>
+                                <h4 className={`font-bold text-sm ${newProgramData.include_next_term ? 'text-indigo-700' : 'text-slate-700'}`}>Include Next Term Fee?</h4>
+                                <p className="text-xs font-medium text-slate-400 mt-1 leading-relaxed">
+                                    Automatically add the fee for the upcoming term to this invoice.
+                                </p>
                             </div>
                         </div>
 
-                        <Input 
-                            label="Admission Date" 
-                            name="admission_date" 
-                            type="date" 
-                            value={newProgramData.admission_date} 
-                            onChange={(e: any) => setNewProgramData(prev => ({ ...prev, admission_date: e.target.value }))}
-                            required 
-                        />
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
+                    
+                    <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                         <button 
                             onClick={() => { setIsAddingProgram(false); setEditingProgramIndex(null); }}
-                            className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg font-bold text-xs"
+                            className="px-6 py-3.5 rounded-xl font-bold text-sm text-slate-500 hover:text-slate-700 hover:bg-white border border-transparent hover:border-slate-200 transition-all"
                         >
                             Cancel
                         </button>
                         <button 
                             onClick={handleAddProgram}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700"
+                            className="px-8 py-3.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-200/50 transition-all flex items-center gap-2 active:scale-95 from-indigo-600 to-indigo-700 bg-gradient-to-br"
                         >
                              {editingProgramIndex !== null ? 'Update Program' : 'Add Program'}
+                             <ArrowRight size={18} />
                         </button>
                     </div>
                 </div>
@@ -1047,9 +1291,14 @@ export default function AddStudentPage() {
                                 <ShieldAlert size={24} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-slate-800">Duplicate Student Detected</h3>
+                                <h3 className="text-xl font-bold text-slate-800">
+                                    {duplicateCheck.type === 'phone' ? 'Phone Number Already Exists' : 'Duplicate Student Detected'}
+                                </h3>
                                 <p className="text-slate-500 text-sm mt-1">
-                                    We found students with the name <span className="font-bold text-slate-800">"{formData.first_name} {formData.last_name}"</span> already in the system.
+                                    {duplicateCheck.type === 'phone' 
+                                        ? duplicateCheck.message 
+                                        : `We found students with the name "${formData.first_name} ${formData.last_name}" already in the system.`
+                                    }
                                 </p>
                             </div>
                         </div>
@@ -1104,28 +1353,18 @@ export default function AddStudentPage() {
                         type="button" 
                         onClick={prevStep} 
                         disabled={currentStep === 1 || currentStep === 4}
-                        className={`px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 transition-all order-1 ${currentStep === 1 || currentStep === 4 ? 'hidden' : 'text-slate-500 hover:bg-slate-100'}`}
+                        className={`px-8 py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all order-1 shadow-sm border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 active:scale-95 min-w-[160px] ${currentStep === 1 || currentStep === 4 ? 'hidden' : ''}`}
                     >
                         <ArrowLeft size={18} />
                         <span>Back</span>
                     </button>
 
                     <div className="flex items-center gap-3 order-2">
-                        {/* Removed Save Draft as per new requirements or kept as placeholder? 
-                            Let's keep it but make it validate first? Or disable.
-                            User said "can't next step until we put the data first".
-                            Save Draft typically BYPASSES validation.
-                            I will disable Save Draft or remove logic for now to enforce strictness.
-                            Actually, the user said "can't next step until we put the data",
-                            Save Draft is not Next Step.
-                            I implemented handleSaveEarly to just alert for now.
-                        */}
-                        
                         {currentStep < 3 ? (
                             <button 
                                 type="button" 
                                 onClick={nextStep}
-                                className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                                className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 min-w-[160px]"
                             >
                                 <span>{currentStep === 3 ? 'Review Enrollment' : 'Next Step'}</span>
                                 <ArrowRight size={18} />
@@ -1135,7 +1374,7 @@ export default function AddStudentPage() {
                                 type="button" 
                                 onClick={(e) => handleSubmit(e as any)}
                                 disabled={submitting}
-                                className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
+                                className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 min-w-[160px]"
                             >
                                 {submitting ? <Loader2 className="animate-spin" /> : <CheckCircle size={18} />}
                                 <span>Complete Admission</span>
@@ -1186,8 +1425,8 @@ function Stepper({ currentStep }: { currentStep: number }) {
                 </div>
                 
                 {/* Absolute Label to prevent layout shift */}
-                <div className="absolute top-12 left-1/2 -translate-x-1/2 w-max text-center">
-                    <span className={`text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${isActive ? 'text-indigo-600' : isCompleted ? 'text-indigo-600' : 'text-slate-400'}`}>
+                <div className="absolute top-12 left-1/2 -translate-x-1/2 w-max text-center hidden sm:block">
+                    <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${isActive ? 'text-indigo-600' : isCompleted ? 'text-indigo-600' : 'text-slate-400'}`}>
                         {step.label}
                     </span>
                 </div>

@@ -196,7 +196,7 @@ export default function TermsPage() {
                 created_at: new Date().toISOString()
             });
 
-            // 2. Run Rollover
+            // 2. Run Transfer
             await termService.rolloverEnrollments(
                 rolloverSource.term_id, 
                 newTermRef.id, 
@@ -206,11 +206,11 @@ export default function TermsPage() {
                 }
             );
 
-            alert("Term Rollover Complete!");
+            alert("Session Transfer Complete!");
             setShowRollover(false);
         } catch (error) {
             console.error(error);
-            alert("Rollover Failed. Check console.");
+            alert("Transfer Failed. Check console.");
         } finally {
             setSubmitting(false);
         }
@@ -258,67 +258,73 @@ export default function TermsPage() {
     });
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-[1800px] mx-auto space-y-6 pb-20 px-4 md:px-0">
             {/* HEADER */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 glass p-3 px-5 rounded-3xl shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                        <Calendar size={16} />
-                    </div>
-                    <h1 className="text-lg font-bold text-slate-800">Terms</h1>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
+            <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100 animate-in zoom-in-95 duration-500">
+                    <Calendar size={22} />
                 </div>
-                <button
-                    onClick={openAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
-                >
-                    <Plus size={14} />
-                    <span>Add Term</span>
-                </button>
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Academic Sessions</h1>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Term Management</span>
+                        <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{terms.length} Total Sessions</span>
+                    </div>
+                </div>
             </div>
+            <button
+                onClick={openAdd}
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 text-white rounded-[1.25rem] font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 transform hover:-translate-y-0.5"
+            >
+                <Plus size={18} />
+                <span>New Session</span>
+            </button>
+        </div>
 
             {/* FILTERS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Branch Filter */}
-                <div className="glass p-2 pl-3 pr-4 rounded-2xl flex items-center gap-3 relative group transition-all hover:shadow-md hover:shadow-indigo-50/50 border border-transparent focus-within:border-indigo-100 focus-within:ring-4 focus-within:ring-indigo-500/10 bg-white/60">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-transform group-hover:scale-105 border border-indigo-100/50">
-                        <Building2 size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5 ml-1">Branch</p>
+        {/* FILTERS */}
+        <div className="bg-white/60 backdrop-blur-md p-5 rounded-[2rem] border border-white/50 shadow-sm transition-all duration-300">
+            <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Branch Filter */}
+                    <div className="relative group z-20">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center pointer-events-none transition-transform group-hover:scale-110">
+                            <Building2 size={14} />
+                        </div>
                         <select
                             value={filterBranch}
                             onChange={(e) => setFilterBranch(e.target.value)}
-                            className="w-full bg-transparent font-bold text-slate-700 text-sm outline-none appearance-none cursor-pointer p-0.5"
+                            className="w-full pl-12 pr-10 py-3 bg-white/70 border border-slate-200/80 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all appearance-none cursor-pointer hover:bg-white shadow-sm"
                         >
                             <option value="">All Branches</option>
                             {branches.map(b => (
                                 <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
                     </div>
-                    <ChevronDown className="text-slate-300 group-hover:text-indigo-400 transition-colors pointer-events-none" size={16} />
-                </div>
 
-                {/* Status Filter */}
-                <div className="glass p-2 pl-3 pr-4 rounded-2xl flex items-center gap-3 relative group transition-all hover:shadow-md hover:shadow-indigo-50/50 border border-transparent focus-within:border-indigo-100 focus-within:ring-4 focus-within:ring-indigo-500/10 bg-white/60">
-                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center transition-transform group-hover:scale-105 border border-purple-100/50">
-                        <Filter size={18} />
-                    </div>
-                     <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5 ml-1">Status</p>
+                    {/* Status Filter */}
+                    <div className="relative group z-20">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center pointer-events-none transition-transform group-hover:scale-110">
+                            <Filter size={14} />
+                        </div>
                         <select
                             value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value as "all" | "active" | "inactive")}
-                            className="w-full bg-transparent font-bold text-slate-700 text-sm outline-none appearance-none cursor-pointer p-0.5"
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
+                            className="w-full pl-12 pr-10 py-3 bg-white/70 border border-slate-200/80 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all appearance-none cursor-pointer hover:bg-white shadow-sm"
                         >
-                            <option value="all">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="all">All Session States</option>
+                            <option value="active">Active Now</option>
+                            <option value="inactive">Previous & Upcoming</option>
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
                     </div>
-                    <ChevronDown className="text-slate-300 group-hover:text-purple-400 transition-colors pointer-events-none" size={16} />
                 </div>
             </div>
+        </div>
 
             {/* FORM MODAL */}
             {showForm && (
@@ -352,7 +358,7 @@ export default function TermsPage() {
                         <form onSubmit={handleSubmit} className="p-8 overflow-y-auto">
                             <div className="space-y-6">
                                 {/* Top Row: Name & Status */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <div className="md:col-span-2">
                                         <label className="block text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wide ml-1">Term Name</label>
                                         <input
@@ -382,7 +388,7 @@ export default function TermsPage() {
                                                 <Filter size={14} />
                                         </div>
                                     </div>
-                                    {!editTerm && (
+                                     {!editTerm && (
                                         <div className="flex items-center gap-2 mt-8 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                                             <input
                                                 type="checkbox"
@@ -392,8 +398,8 @@ export default function TermsPage() {
                                                 className="w-5 h-5 rounded-lg border-2 border-blue-200 text-blue-600 focus:ring-blue-500 rounded focus:ring-offset-0"
                                             />
                                             <label htmlFor="rollover" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
-                                                Rollover active students from previous term?
-                                                <p className="text-[10px] text-slate-400 font-normal mt-0.5">Active enrollments will be copied with "Unpaid" status.</p>
+                                                Bring students from the last session?
+                                                <p className="text-[10px] text-slate-400 font-normal mt-0.5">Students will start as <span className="text-rose-500 font-black tracking-widest uppercase">"Unpaid"</span> for the new term.</p>
                                             </label>
                                         </div>
                                     )}
@@ -401,7 +407,7 @@ export default function TermsPage() {
                                 </div>
 
                                 {/* Middle Row: Dates & Branch */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <div>
                                         <label className="block text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wide ml-1">Start Date</label>
                                         <input
@@ -527,106 +533,111 @@ export default function TermsPage() {
                         <p className="text-slate-400 text-sm">No terms found. Click "Add Term" to create one.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredTerms.map(term => (
-                            <div 
-                                key={term.term_id} 
-                                className="group relative bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:translate-y-[-2px] transition-all duration-300 overflow-hidden cursor-pointer"
-                                onClick={() => router.push(`/admin/attendance/terms/${term.term_id}/classes`)}
-                            >
-                                {/* Decorative Background Gradient */}
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-50/50 to-violet-50/50 rounded-bl-[4rem] -z-0 transition-transform group-hover:scale-110" />
+                                <div 
+                                    key={term.term_id} 
+                                    className="group relative bg-white border border-slate-200/60 rounded-[2.25rem] p-7 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] hover:scale-[1.02] hover:border-indigo-200 transition-all duration-500 overflow-hidden cursor-pointer active:scale-95"
+                                    onClick={() => router.push(`/admin/attendance/terms/${term.term_id}/classes`)}
+                                >
+                                {/* Premium Background Accent */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-bl-[4rem] group-hover:from-indigo-500/10 group-hover:to-purple-500/10 transition-colors" />
 
                                 {/* Header: Status & Actions */}
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                                <div className="flex justify-between items-center mb-6 relative z-10">
+                                    <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border-2 font-black text-[9px] uppercase tracking-widest ${
                                         isTermActive(term) 
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm shadow-emerald-100' 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm shadow-emerald-50' 
                                         : 'bg-slate-50 text-slate-400 border-slate-100'
                                     }`}>
-                                        {isTermActive(term) ? 'Active Session' : 'Inactive'}
-                                    </span>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isTermActive(term) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                                        {isTermActive(term) ? 'Active Session' : 'Offline'}
+                                    </div>
 
-                                    <div className="flex items-center gap-1">
-                                        
-                                        {/* Edit */}
+                                    <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 openEdit(term);
                                             }}
-                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-indigo-100 transition-all"
                                         >
-                                            <Pencil size={14} strokeWidth={2.5} />
+                                            <Pencil size={15} />
                                         </button>
 
-                                        {/* Delete */}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleDelete(term.term_id);
                                             }}
-                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-md border border-transparent hover:border-rose-100 transition-all"
                                         >
-                                            <Trash2 size={14} strokeWidth={2.5} />
+                                            <Trash2 size={15} />
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Content */}
-                                <div className="relative z-10 space-y-4">
+                                <div className="relative z-10 space-y-5">
                                     <div>
-                                        <h3 className="text-xl font-black text-slate-800 mb-1 leading-tight group-hover:text-indigo-600 transition-colors">{term.term_name}</h3>
-                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                                            <Calendar size={14} className="text-indigo-400" />
-                                            <span>{new Date(term.start_date).toLocaleDateString()} - {new Date(term.end_date).toLocaleDateString()}</span>
+                                        <h3 className="text-xl font-black text-slate-900 mb-2 leading-snug group-hover:text-indigo-600 transition-colors tracking-tight">{term.term_name}</h3>
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl w-fit group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-100">
+                                            <Calendar className="text-indigo-500" size={14} />
+                                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                                {new Date(term.start_date).toLocaleDateString()} — {new Date(term.end_date).toLocaleDateString()}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3 py-3 border-y border-slate-50">
+                                    <div className="flex items-center gap-4 py-4 border-y border-slate-100/80">
                                         <div className="flex-1">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Branch</p>
-                                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                                                <Building2 size={14} className="text-slate-300" />
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Primary Branch</p>
+                                            <div className="flex items-center gap-2 text-sm font-black text-slate-700">
+                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                                    <Building2 size={16} />
+                                                </div>
                                                 {getBranchName(term.branch_id)}
                                             </div>
                                         </div>
-                                        {/* Optional: Add Stats or Count if available */}
                                     </div>
 
                                     <div>
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2">Programs</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 leading-none">Curricula Scope</p>
                                         <div className="flex flex-wrap gap-1.5">
                                             {term.program_ids && term.program_ids.length > 0 ? (
-                                                term.program_ids.map(pid => (
-                                                    <span key={pid} className="px-2 py-1 rounded-md bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-600 group-hover:border-indigo-100 group-hover:bg-indigo-50/50 group-hover:text-indigo-600 transition-all">
+                                                term.program_ids.slice(0, 3).map(pid => (
+                                                    <span key={pid} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:border-indigo-100 group-hover:text-indigo-600 transition-all shadow-sm">
                                                         {getProgramName(pid)}
                                                     </span>
                                                 ))
                                             ) : (
-                                                <span className="text-slate-300 text-[10px] italic">No programs linked</span>
+                                                <span className="text-slate-300 text-[10px] font-bold italic uppercase tracking-widest leading-none">No programs linked</span>
+                                            )}
+                                            {term.program_ids && term.program_ids.length > 3 && (
+                                                <span className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                    +{term.program_ids.length - 3} More
+                                                </span>
                                             )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Generate Next Term Button (Conditional) */}
+                                {/* Rollover CTA */}
                                 {(() => {
                                     const branchTerms = terms.filter(t => t.branch_id === term.branch_id);
                                     const latestTerm = branchTerms.sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0];
                                     if (latestTerm && latestTerm.term_id === term.term_id) {
                                         return (
-                                            <div className="mt-5 pt-4 border-t border-slate-50">
+                                            <div className="mt-6 pt-5 border-t border-slate-100/80">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        e.stopPropagation();
                                                         openRolloverWizard(term);
                                                     }}
-                                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-indigo-600 shadow-lg shadow-slate-200 hover:shadow-indigo-200 transition-all transform active:scale-95"
+                                                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-[0.15em] hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all hover:-translate-y-0.5"
                                                 >
-                                                    <CalendarCheck size={14} />
-                                                    <span>Create Next Term</span>
+                                                    <CalendarCheck size={16} />
+                                                    <span>Move students to new session</span>
                                                 </button>
                                             </div>
                                         );
@@ -645,10 +656,10 @@ export default function TermsPage() {
                     <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         {/* Header */}
                         <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                            <h2 className="text-xl font-black text-slate-800">New Term Rollover</h2>
+                            <h2 className="text-xl font-black text-slate-800">Move Students to New Session</h2>
                             <button onClick={() => setShowRollover(false)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={20} /></button>
                         </div>
-                        
+
                         <div className="p-8 space-y-8 overflow-y-auto">
                             {/* Step 1: Term Details */}
                             <div className="space-y-4">
@@ -662,7 +673,7 @@ export default function TermsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Target Term Name</label>
-                                        <input 
+                                        <input
                                             value={rolloverConfig.targetName}
                                             onChange={e => setRolloverConfig({...rolloverConfig, targetName: e.target.value})}
                                             className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-indigo-500 outline-none"
@@ -670,7 +681,7 @@ export default function TermsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Start Date</label>
-                                        <input 
+                                        <input
                                             type="date"
                                             value={rolloverConfig.startDate}
                                             onChange={e => setRolloverConfig({...rolloverConfig, startDate: e.target.value})}
@@ -688,7 +699,7 @@ export default function TermsPage() {
                                         <input type="checkbox" checked={rolloverConfig.includeActive} onChange={e => setRolloverConfig({...rolloverConfig, includeActive: e.target.checked})} className="mt-1 w-5 h-5 accent-indigo-600" />
                                         <div>
                                             <p className="font-bold text-slate-800 text-sm">Active Students</p>
-                                            <p className="text-[10px] text-slate-400 mt-1">Copy active enrollments (Set to Unpaid)</p>
+                                            <p className="text-[10px] text-slate-400 mt-1 italic font-bold">Transfer active students (<span className="text-rose-500 underline uppercase tracking-widest">Unpaid</span>)</p>
                                         </div>
                                     </label>
                                     <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${rolloverConfig.includeHold ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
@@ -701,12 +712,12 @@ export default function TermsPage() {
                                 </div>
                             </div>
 
-                            <button 
+                            <button
                                 onClick={handleRolloverSubmit}
                                 disabled={submitting || (!rolloverConfig.includeActive && !rolloverConfig.includeHold)}
                                 className="w-full py-4 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                {submitting ? <Loader2 className="animate-spin" /> : <><CalendarCheck size={20} /> Start Rollover</>}
+                                {submitting ? <Loader2 className="animate-spin" /> : <><CalendarCheck size={20} /> Transfer Now</>}
                             </button>
                         </div>
                     </div>

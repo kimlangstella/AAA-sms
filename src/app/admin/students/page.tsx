@@ -18,6 +18,7 @@ import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { AddInsuranceModal } from "@/components/modals/AddInsuranceModal";
 import ImportStudentModal from "@/components/modals/ImportStudentModal";
+import * as XLSX from "xlsx";
 
 // Column definition
 const ALL_COLUMNS = [
@@ -300,31 +301,57 @@ export default function StudentsPage() {
     };
 
     const handleExport = () => {
-        const headers = ['Student ID', 'Name', 'Gender', 'DOB', 'Branch', 'Program', 'Status', 'Payment Status'];
-        const data = filteredAndSortedStudents.map(s => [
+        if (filteredAndSortedStudents.length === 0) return;
+
+        // 1. Prepare Header Rows (Pretty Template)
+        const headerRows = [
+            ["Authentic Advanced Academy (AAA)"],
+            ["Student List Report"],
+            [`Export Date: ${new Date().toLocaleDateString()}`],
+            [`Total Students: ${filteredAndSortedStudents.length}`],
+            [], // Spacer
+            ['Student ID', 'Name', 'Gender', 'DOB', 'Nationality', 'Branch', 'Program', 'Status', 'Admission Date', 'Payment Status']
+        ];
+
+        // 2. Prepare Data Rows
+        const dataRows = filteredAndSortedStudents.map(s => [
             s.student_code,
             s.student_name,
             s.gender,
             s.dob,
+            s.nationality,
             s.branch_name,
             s.program,
             s.status,
+            s.admission_date,
             s.payment_status
         ]);
-        
-        const csvContent = [
-            headers.join(','),
-            ...data.map(row => row.map(cell => `"${cell}"`).join(','))
-        ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `students_export_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // 3. Combine and Create Sheet
+        const allRows = [...headerRows, ...dataRows];
+        const worksheet = XLSX.utils.aoa_to_sheet(allRows);
+
+        // 4. Set Column Widths
+        const wscols = [
+            { wch: 15 }, // Student ID
+            { wch: 30 }, // Name
+            { wch: 10 }, // Gender
+            { wch: 15 }, // DOB
+            { wch: 15 }, // Nationality
+            { wch: 20 }, // Branch
+            { wch: 25 }, // Program
+            { wch: 12 }, // Status
+            { wch: 15 }, // Admission Date
+            { wch: 15 }, // Payment Status
+        ];
+        worksheet['!cols'] = wscols;
+
+        // 5. Create Workbook and Write
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+        
+        // Use XLSX.writeFile for browser download
+        XLSX.writeFile(workbook, `Students_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     if (loading) {
@@ -336,256 +363,210 @@ export default function StudentsPage() {
     }
 
     return (
-        <div className="max-w-[98%] mx-auto space-y-6 pb-8">
+        <div className="w-full max-w-[1800px] mx-auto space-y-10 pb-20 font-sans">
             
-            {/* Header / Title */}
-            <div className="flex items-center justify-between py-2 px-1">
-                 <div className="flex items-center gap-4">
-                    <h1 className="text-2xl font-black text-slate-800">Students <span className="text-sm font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-2">{filteredAndSortedStudents.length}</span></h1>
+            {/* Header Area */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/40 backdrop-blur-md p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300">
+                 <div className="flex items-center gap-4 sm:gap-5">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-[1.5rem] bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 shrink-0">
+                        <Users size={20} className="sm:hidden" />
+                        <Users size={32} className="hidden sm:block" />
+                    </div>
+                    <div>
+                        <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 sm:gap-3">
+                            Students 
+                            <span className="text-[10px] sm:text-xs font-black bg-indigo-50 text-indigo-600 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-indigo-100/50">
+                                {filteredAndSortedStudents.length} TOTAL
+                            </span>
+                        </h1>
+                        <p className="text-[11px] sm:text-sm font-medium text-slate-500 mt-0.5 sm:mt-1">Manage student directory and academic records</p>
+                    </div>
                  </div>
-                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => router.push('/admin/students/add')}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200/50"
-                    >
-                        <UserPlus size={18} />
-                        <span>Add Student</span>
-                    </button>
+
+                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-full text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50"
-                        title="Export CSV"
+                        className="p-3 sm:p-3.5 bg-white text-slate-500 rounded-xl sm:rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all border border-slate-100 shadow-sm hover:shadow-lg active:scale-95 group"
+                        title="Export Report"
                     >
-                        <Download size={18} />
+                        <Download size={18} className="sm:hidden" />
+                        <Download size={20} className="hidden sm:block transition-transform group-hover:scale-110" />
                     </button>
                     <button
                         onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-slate-900 transition-all shadow-lg shadow-slate-200/50"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:px-6 sm:py-3.5 bg-white text-slate-700 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all border border-slate-100 shadow-sm hover:shadow-lg active:scale-95 group"
                     >
-                        <Download size={18} className="rotate-180" />
-                        <span>Import Student</span>
+                        <Download size={18} className="rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors sm:hidden" />
+                        <Download size={20} className="rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors hidden sm:block" />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => router.push('/admin/students/add')}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 sm:px-8 bg-indigo-600 text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all hover:-translate-y-0.5 active:scale-95"
+                    >
+                        <UserPlus size={18} className="sm:hidden" />
+                        <UserPlus size={20} className="hidden sm:block" />
+                        <span>Add New Student</span>
                     </button>
                  </div>
             </div>
 
-            {/* TOOLBAR */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-                
-                {/* Search */}
-                <div className="relative w-full md:w-[310px]">
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-6 pr-12 py-3 bg-white text-slate-700 rounded-full border border-slate-100 shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm font-bold placeholder:text-slate-400"
-                    />
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
+            {/* Toolbar Area */}
+            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300 relative z-30">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-4 sm:gap-6">
                     
-                    {/* Filter Button */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => { setShowFilterPanel(!showFilterPanel); setShowSortPanel(false); setShowColumnPanel(false); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
-                        >
-                            <Filter size={16} />
-                            <span>Filter</span>
-                        </button>
-
-                        {/* Filter Popup - Dark */}
-                        {showFilterPanel && (
-                            <>
-                                <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1">
-                                        
-                                        {/* Status */}
-                                        <div className="px-2 py-2">
-                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Status</h4>
-                                            <div className="space-y-0.5">
-                                                {['Active', 'Inactive', 'Hold'].map(status => (
-                                                    <button
-                                                        key={status}
-                                                        onClick={() => setFilterStatus(filterStatus === status ? "" : status)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
-                                                    >
-                                                        <span>{status}</span>
-                                                        {filterStatus === status && <Check size={14} className="text-indigo-500" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="h-px bg-slate-50 my-1" />
-
-                                        {/* Branch */}
-                                        <div className="px-2 py-2">
-                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Branch</h4>
-                                            <div className="space-y-0.5">
-                                                {branches.map(b => (
-                                                    <button
-                                                        key={b.branch_id}
-                                                        onClick={() => setFilterBranch(filterBranch === b.branch_id ? "" : b.branch_id)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
-                                                    >
-                                                        <span className="truncate">{b.branch_name}</span>
-                                                        {filterBranch === b.branch_id && <Check size={14} className="text-indigo-500" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                         <div className="h-px bg-slate-50 my-1" />
-
-                                         {/* Payment Status */}
-                                         <div className="px-2 py-2">
-                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Payment</h4>
-                                            <div className="space-y-0.5">
-                                                {['Paid', 'Unpaid'].map(status => (
-                                                    <button
-                                                        key={status}
-                                                        onClick={() => setFilterPaymentStatus(filterPaymentStatus === status ? "" : status)}
-                                                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
-                                                    >
-                                                        <span>{status}</span>
-                                                        {filterPaymentStatus === status && <Check size={14} className="text-indigo-500" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Sort Button */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => { setShowSortPanel(!showSortPanel); setShowFilterPanel(false); setShowColumnPanel(false); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
-                        >
-                            <ArrowUpDown size={16} />
-                            <span>Sort</span>
-                        </button>
-
-                         {/* Sort Popup - Dark */}
-                         {showSortPanel && (
-                            <>
-                                <div className="fixed inset-0 z-20" onClick={() => setShowSortPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="p-1 space-y-0.5">
-                                        {[
-                                            { label: 'Admission Date', key: 'admission_date' },
-                                            { label: 'Name', key: 'name' }
-                                        ].map((opt) => (
-                                             <button
-                                                key={opt.key}
-                                                onClick={() => handleSort(opt.key)}
-                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold"
-                                            >
-                                                <span>{opt.label}</span>
-                                                {sortConfig?.key === opt.key && (
-                                                    sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-indigo-500" /> : <ArrowDown size={14} className="text-indigo-500" />
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </>
-                         )}
-                    </div>
-
-                    {/* Columns Button */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => { setShowColumnPanel(!showColumnPanel); setShowFilterPanel(false); setShowSortPanel(false); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
-                        >
-                            <Settings2 size={16} />
-                            <span>Columns</span>
-                        </button>
-
-                        {/* Column Popup - Dark & Long List */}
-                         {showColumnPanel && (
-                            <>
-                                <div className="fixed inset-0 z-20" onClick={() => setShowColumnPanel(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                                     <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1 space-y-0.5">
-                                        {ALL_COLUMNS.map(col => (
-                                            <button
-                                                key={col.key}
-                                                onClick={() => toggleColumn(col.key)}
-                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left group font-bold"
-                                            >
-                                                <span className={`${visibleColumns.includes(col.key) ? 'text-slate-800' : 'text-slate-400'}`}>{col.label}</span>
-                                                {visibleColumns.includes(col.key) && <Check size={14} className="text-indigo-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </>
-                         )}
-                    </div>
-
-                    {/* Selection Actions */}
-                    {selectedStudents.size > 0 && (
-                        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
-                            <div className="w-px h-6 bg-slate-200 mx-1" />
-                            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">
-                                {selectedStudents.size === filteredAndSortedStudents.length ? "All items selected" : `${selectedStudents.size} items selected`}
-                            </span>
-                            <div className="relative">
-                                <button 
-                                    onClick={() => { setShowBulkActions(!showBulkActions); setShowFilterPanel(false); setShowSortPanel(false); setShowColumnPanel(false); }}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all border border-slate-200 shadow-sm hover:shadow-md"
-                                >
-                                    <span>Selected Actions</span>
-                                    <ChevronDown size={16} className={`transition-transform duration-200 ${showBulkActions ? 'rotate-180' : ''}`} />
-                                </button>
-                                {showBulkActions && (
-                                    <>
-                                        <div className="fixed inset-0 z-20" onClick={() => setShowBulkActions(false)} />
-                                        <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 p-1 text-slate-600 animate-in fade-in zoom-in-95 duration-200">
-                                            <div className="p-1">
-                                                <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">
-                                                    {selectedStudents.size} selected
-                                                </div>
-                                                <button
-                                                    onClick={() => { handleBulkDelete(); setShowBulkActions(false); }}
-                                                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors text-sm text-left font-black"
-                                                >
-                                                    <Trash2 size={14} />
-                                                    <span>Delete Selected</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => { setSelectedStudents(new Set()); setShowBulkActions(false); }}
-                                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm text-left font-bold text-slate-400"
-                                                >
-                                                    <X size={14} />
-                                                    <span>Clear selection</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                    {/* Left: Search Bar */}
+                    <div className="relative w-full lg:max-w-xl group">
+                        <input
+                            type="text"
+                            placeholder="Search students by name, ID or phone..."
+                            className="w-full pl-6 pr-12 py-3 sm:pl-8 sm:pr-16 sm:py-4 bg-white border border-slate-200 rounded-full text-xs sm:text-sm font-bold placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-300 transition-all shadow-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <div className="absolute inset-y-0 right-5 sm:right-6 flex items-center pointer-events-none">
+                            <Search size={18} className="text-slate-400 group-focus-within:text-indigo-600 transition-colors sm:hidden" />
+                            <Search size={22} className="text-slate-400 group-focus-within:text-indigo-600 transition-colors hidden sm:block" />
                         </div>
-                    )}
+                    </div>
+
+                    {/* Right: View Controls */}
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
+                            <button 
+                                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                                className={`w-full flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border ${
+                                    showFilterPanel || filterBranch || filterStatus || filterPaymentStatus
+                                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-xl shadow-indigo-100'
+                                    : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'
+                                }`}
+                            >
+                                <Filter size={18} />
+                                <span>Filters</span>
+                                {(filterBranch || filterStatus || filterPaymentStatus) && (
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ring-2 ring-white ${
+                                        showFilterPanel || filterBranch || filterStatus || filterPaymentStatus ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'
+                                    }`}>
+                                        {(filterBranch ? 1 : 0) + (filterStatus ? 1 : 0) + (filterPaymentStatus ? 1 : 0)}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Filter Popup */}
+                            {showFilterPanel && (
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
+                                    <div className="absolute top-full right-0 mt-4 w-72 bg-white/90 backdrop-blur-xl border border-white/50 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] z-30 p-2 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                        <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-2">
+                                            {/* Status Section */}
+                                            <div className="mb-4">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Status</h4>
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    {['Active', 'Inactive', 'Hold'].map(status => (
+                                                        <button
+                                                            key={status}
+                                                            onClick={() => setFilterStatus(filterStatus === status ? "" : status)}
+                                                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm font-bold ${
+                                                                filterStatus === status ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'
+                                                            }`}
+                                                        >
+                                                            <span>{status}</span>
+                                                            {filterStatus === status && <Check size={16} />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-slate-100/50 my-4 mx-2" />
+
+                                            {/* Branch Section */}
+                                            <div className="mb-4">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Branch</h4>
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    {branches.map(b => (
+                                                        <button
+                                                            key={b.branch_id}
+                                                            onClick={() => setFilterBranch(filterBranch === b.branch_id ? "" : b.branch_id)}
+                                                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm font-bold ${
+                                                                filterBranch === b.branch_id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'
+                                                            }`}
+                                                        >
+                                                            <span className="truncate">{b.branch_name}</span>
+                                                            {filterBranch === b.branch_id && <Check size={16} />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-slate-100/50 my-4 mx-2" />
+
+                                            {/* Payment Section */}
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Payment</h4>
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    {['Paid', 'Unpaid'].map(status => (
+                                                        <button
+                                                            key={status}
+                                                            onClick={() => setFilterPaymentStatus(filterPaymentStatus === status ? "" : status)}
+                                                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm font-bold ${
+                                                                filterPaymentStatus === status ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'
+                                                            }`}
+                                                        >
+                                                            <span>{status}</span>
+                                                            {filterPaymentStatus === status && <Check size={16} />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="relative flex-1 sm:flex-initial">
+                            <button 
+                                onClick={() => setShowColumnPanel(!showColumnPanel)}
+                                className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-white text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border border-slate-100 hover:bg-slate-50 shadow-sm"
+                            >
+                                <Settings2 size={18} />
+                                <span>Columns</span>
+                            </button>
+
+                            {/* Column Popup */}
+                            {showColumnPanel && (
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setShowColumnPanel(false)} />
+                                    <div className="absolute top-full right-0 mt-4 w-72 bg-white/90 backdrop-blur-xl border border-white/50 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] z-30 p-2 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                                         <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Display Columns</h4>
+                                            {ALL_COLUMNS.map(col => (
+                                                <button
+                                                    key={col.key}
+                                                    onClick={() => toggleColumn(col.key)}
+                                                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm font-bold ${
+                                                        visibleColumns.includes(col.key) ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-500'
+                                                    }`}
+                                                >
+                                                    <span>{col.label}</span>
+                                                    {visibleColumns.includes(col.key) && <Check size={16} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                             )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* TABLE */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto min-h-[400px]">
-                    <table className="w-full">
+            {/* Table Area */}
+            <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 overflow-hidden transition-all duration-300">
+                <div className="overflow-x-auto min-h-[400px] custom-scrollbar">
+                    <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-white border-b border-slate-100">
+                            <tr className="bg-slate-50/50 border-b border-slate-100 transition-colors">
                                 <th className="px-6 py-4 w-12">
                                     <div className="flex items-center justify-center">
                                         <input 
@@ -599,9 +580,9 @@ export default function StudentsPage() {
                                 {ALL_COLUMNS.filter(col => visibleColumns.includes(col.key)).map((col, index) => (
                                     <th
                                         key={col.key}
-                                        className={`text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider ${
+                                        className={`text-left px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.1em] ${
                                             col.sortable ? 'cursor-pointer hover:text-indigo-600 transition-colors' : ''
-                                        } ${col.key === 'name' ? 'min-w-[300px]' : ''} ${col.key === 'dob' ? 'min-w-[150px]' : ''}`}
+                                        } ${col.key === 'name' ? 'min-w-[280px]' : ''} ${col.key === 'dob' ? 'min-w-[140px]' : ''}`}
                                         onClick={() => col.sortable && handleSort(col.key)}
                                     >
                                         <div className="flex items-center gap-2">
@@ -609,9 +590,9 @@ export default function StudentsPage() {
                                             {col.sortable && (
                                                 <span className="text-slate-300">
                                                     {sortConfig?.key === col.key ? (
-                                                        sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-indigo-500" /> : <ArrowDown size={12} className="text-indigo-500" />
                                                     ) : (
-                                                        <ArrowUpDown size={12} />
+                                                        <ArrowUpDown size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     )}
                                                 </span>
                                             )}
@@ -642,7 +623,7 @@ export default function StudentsPage() {
                                             </td>
                                         {visibleColumns.includes('action') && (
                                             <td className="p-4 pl-6">
-                                                <div className="relative">
+                                                <div className="relative z-10">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -852,6 +833,38 @@ export default function StudentsPage() {
                         // Success handling - list will auto-refresh via subscription
                     }}
                 />
+            )}
+            {/* Floating Selection Bar */}
+            {selectedStudents.size > 0 && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 duration-500">
+                    <div className="bg-slate-900 text-white px-8 py-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex items-center gap-8 backdrop-blur-xl border border-white/10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-indigo-500 flex items-center justify-center text-white font-black">
+                                {selectedStudents.size}
+                            </div>
+                            <span className="text-sm font-black uppercase tracking-widest text-slate-400">Selected</span>
+                        </div>
+                        
+                        <div className="w-px h-8 bg-white/10" />
+                        
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={handleBulkDelete}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 text-rose-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all active:scale-95"
+                            >
+                                <Trash2 size={16} />
+                                <span>Delete</span>
+                            </button>
+                            <button 
+                                onClick={() => setSelectedStudents(new Set())}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-white/5 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all active:scale-95"
+                            >
+                                <X size={16} />
+                                <span>Cancel</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

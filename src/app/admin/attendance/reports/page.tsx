@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, Filter, Download, Calendar, Users, TrendingUp, TrendingDown } from "lucide-react";
+import { BarChart3, Filter, Download, Calendar, Users, TrendingUp, TrendingDown, ChevronDown, CheckCircle2 } from "lucide-react";
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { termService } from "@/services/termService";
@@ -256,106 +256,170 @@ export default function AttendanceReportsPage() {
     }, [reportData]);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-[1800px] mx-auto space-y-6">
             {/* HEADER */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 glass p-3 px-5 rounded-3xl shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                        <BarChart3 size={16} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 animate-in zoom-in-95 duration-500">
+                    <BarChart3 size={24} />
+                </div>
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Attendance Analytics</h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Performance Reporting</span>
+                        <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                            {reportData.length} Students Tracked
+                        </span>
                     </div>
-                    <h1 className="text-lg font-bold text-slate-800">Attendance Reports</h1>
                 </div>
-                <button 
-                    onClick={handleExport}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={reportData.length === 0}
-                >
-                    <Download size={16} />
-                    <span>Export Report</span>
-                </button>
             </div>
+            <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                disabled={reportData.length === 0}
+            >
+                <Download size={20} />
+                <span>Export Analytics</span>
+            </button>
+        </div>
 
-            {/* FILTERS */}
-            <div className="glass-panel p-5 space-y-4">
-                <div className="flex items-center gap-2 mb-3">
-                    <Filter size={16} className="text-indigo-600" />
-                    <h2 className="text-sm font-bold text-slate-700">Filters</h2>
+        {/* Analytics Section */}
+        {summaryStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-100 group transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex items-center gap-3 mb-4 opacity-80">
+                         <Users size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Students</span>
+                    </div>
+                    <div className="text-4xl font-black mb-1">{summaryStats.totalStudents}</div>
+                    <div className="text-[10px] font-bold opacity-60">Active Enrollments</div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Term</label>
+
+                <div className="bg-white/60 backdrop-blur-md border border-white/50 rounded-[2rem] p-6 shadow-sm group transition-all duration-300 hover:shadow-xl hover:shadow-indigo-50 hover:scale-[1.02]">
+                    <div className="flex items-center gap-3 mb-4 text-indigo-500">
+                         <TrendingUp size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em]">Avg. Attendance</span>
+                    </div>
+                    <div className="text-4xl font-black text-slate-900 mb-1">{summaryStats.avgAttendanceRate}%</div>
+                    <div className="text-[10px] font-bold text-slate-400">Class Average</div>
+                </div>
+
+                <div className="bg-white/60 backdrop-blur-md border border-white/50 rounded-[2rem] p-6 shadow-sm group transition-all duration-300 hover:shadow-xl hover:shadow-emerald-50 hover:scale-[1.02]">
+                    <div className="flex items-center gap-3 mb-4 text-emerald-500">
+                         <CheckCircle2 size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em]">Excellent Status</span>
+                    </div>
+                    <div className="text-4xl font-black text-slate-900 mb-1">{summaryStats.goodAttendance}</div>
+                    <div className="text-[10px] font-bold text-slate-400">&gt;90% Rate</div>
+                </div>
+
+                <div className="bg-white/60 backdrop-blur-md border border-white/50 rounded-[2rem] p-6 shadow-sm group transition-all duration-300 hover:shadow-xl hover:shadow-rose-50 hover:scale-[1.02]">
+                    <div className="flex items-center gap-3 mb-4 text-rose-500">
+                         <TrendingDown size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em]">Critical Review</span>
+                    </div>
+                    <div className="text-4xl font-black text-slate-900 mb-1">{summaryStats.poorAttendance}</div>
+                    <div className="text-[10px] font-bold text-slate-400">&lt;70% Rate</div>
+                </div>
+            </div>
+        )}
+
+        {/* FILTERS */}
+        <div className="bg-white/60 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/50 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-indigo-50 rounded-xl">
+                    <Filter size={20} className="text-indigo-600" />
+                </div>
+                <div>
+                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Report Filters</h2>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Define your reporting criteria</p>
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Term Selection</label>
+                    <div className="relative group">
                         <select
                             value={filterTerm}
                             onChange={(e) => {
                                 setFilterTerm(e.target.value);
-                                setFilterBranch(""); // Reset branch when term changes? 
-                                // Actually, if a term is selected, maybe we should auto-select the branch
                                 const term = terms.find(t => t.term_id === e.target.value);
                                 if (term) setFilterBranch(term.branch_id);
                                 setFilterProgram("");
                                 setFilterClass("");
                             }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
+                            className="w-full pl-5 pr-10 py-4 bg-white/50 border border-slate-200/60 rounded-[1.25rem] text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:bg-white"
                         >
                             <option value="">All Terms</option>
                             {terms.map(term => (
                                 <option key={term.term_id} value={term.term_id}>{term.term_name}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={16} />
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Branch</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Branch Context</label>
+                    <div className="relative group">
                         <select
                             value={filterBranch}
                             onChange={(e) => {
                                 setFilterBranch(e.target.value);
-                                // setFilterTerm(""); // Don't reset term here if we want term to be primary
                                 setFilterProgram("");
                                 setFilterClass("");
                             }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
+                            className="w-full pl-5 pr-10 py-4 bg-white/50 border border-slate-200/60 rounded-[1.25rem] text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:bg-white"
                         >
                             <option value="">All Branches</option>
                             {branches.map(branch => (
                                 <option key={branch.branch_id} value={branch.branch_id}>{branch.branch_name}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Program</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Academic Program</label>
+                    <div className="relative group">
                         <select
                             value={filterProgram}
                             onChange={(e) => {
                                 setFilterProgram(e.target.value);
                                 setFilterClass("");
                             }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
+                            className="w-full pl-5 pr-10 py-4 bg-white/50 border border-slate-200/60 rounded-[1.25rem] text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:bg-white"
                         >
                             <option value="">All Programs</option>
                             {filteredPrograms.map(program => (
                                 <option key={program.id} value={program.id}>{program.name}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Class</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Classroom View</label>
+                    <div className="relative group">
                         <select
                             value={filterClass}
                             onChange={(e) => setFilterClass(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-sm"
+                            className="w-full pl-5 pr-10 py-4 bg-white/50 border border-slate-200/60 rounded-[1.25rem] text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:bg-white"
                         >
                             <option value="">All Classes</option>
                             {filteredClasses.map(cls => (
                                 <option key={cls.class_id} value={cls.class_id}>{cls.className}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     </div>
                 </div>
             </div>
+        </div>
 
             {/* REPORT CONTENT */}
             {!filterBranch && !filterClass ? (

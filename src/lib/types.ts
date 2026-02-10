@@ -110,6 +110,8 @@ export interface Enrollment {
     payment_type: PaymentType; // "Cash" or "ABA"
     payment_due_date?: string; // Date string
     payment_expired?: string; // Date string
+    branchId?: string;
+    programId?: string;
 
     enrollment_status: EnrollmentStatus; // Active, Hold, Completed, Dropped
 

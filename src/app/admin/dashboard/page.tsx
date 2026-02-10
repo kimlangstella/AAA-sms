@@ -4,17 +4,20 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Users, 
-  UserPlus,
+  UserPlus, 
   GraduationCap, 
   Wallet, 
-  School,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Bell,
-  ChevronDown,
-  TrendingUp,
-  Shield
+  School, 
+  MoreHorizontal, 
+  Plus, 
+  Search, 
+  Bell, 
+  ChevronDown, 
+  TrendingUp, 
+  Shield,
+  LayoutGrid,
+  LayoutDashboard,
+  Calendar
 } from "lucide-react";
 import { 
     subscribeToStudents, 
@@ -51,31 +54,57 @@ interface DashboardStats {
 // --- Components ---
 
 
-function MetricCard({ title, value, icon: Icon, colorClass, iconBgClass, isPrimary }: any) {
+function MetricCard({ title, value, icon: Icon, colorClass, iconBgClass, isPrimary, trend, trendValue }: any) {
     return (
-        <div className={`p-5 rounded-[18px] shadow-sm border flex items-start justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+        <div className={`group p-6 rounded-[2rem] border transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] relative overflow-hidden ${
             isPrimary 
-                ? 'bg-gradient-to-br from-indigo-50 to-white border-indigo-100 shadow-md' 
-                : 'bg-white border-slate-100'
+                ? 'bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 border-indigo-400 text-white shadow-xl shadow-indigo-200' 
+                : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200'
         }`}>
-            <div>
-                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${iconBgClass}`}>
-                    <Icon size={20} className={colorClass} />
+            {/* Background pattern for primary card */}
+            {isPrimary && (
+                <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12 transition-transform group-hover:rotate-45 duration-700">
+                    <Icon size={120} />
+                </div>
+            )}
+
+            <div className="relative z-10 flex flex-col h-full justify-between">
+                 <div className="flex items-start justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500 shadow-sm ${
+                        isPrimary ? 'bg-white/20 backdrop-blur-md' : iconBgClass
+                    }`}>
+                        <Icon size={24} className={isPrimary ? 'text-white' : colorClass} />
+                    </div>
+                    <button className={`${isPrimary ? 'text-white/40 hover:text-white' : 'text-slate-300 hover:text-indigo-500'} transition-colors`}>
+                        <MoreHorizontal size={18} />
+                    </button>
                  </div>
-                 <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">{value}</h3>
-                 <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mt-1">{title}</p>
+                 
+                 <div>
+                    <h3 className={`text-3xl font-black tracking-tight mb-1 ${isPrimary ? 'text-white' : 'text-slate-900'}`}>{value}</h3>
+                    <p className={`text-[11px] font-bold uppercase tracking-widest ${isPrimary ? 'text-indigo-100' : 'text-slate-400'}`}>{title}</p>
+                 </div>
+
+                 {(trendValue || trend) && (
+                    <div className={`mt-4 pt-4 border-t flex items-center gap-2 ${isPrimary ? 'border-white/10' : 'border-slate-50'}`}>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            trend === 'up' ? (isPrimary ? 'bg-emerald-400/20 text-emerald-300' : 'bg-emerald-50 text-emerald-600') : (isPrimary ? 'bg-rose-400/20 text-rose-300' : 'bg-rose-50 text-rose-600')
+                        }`}>
+                            {trend === 'up' ? <TrendingUp size={10} /> : <TrendingUp size={10} className="rotate-180" />}
+                            {trendValue}
+                        </div>
+                        <span className={`text-[10px] font-bold ${isPrimary ? 'text-indigo-200/60' : 'text-slate-300'}`}>vs last month</span>
+                    </div>
+                 )}
             </div>
-            <button className="text-slate-300 hover:text-slate-500 transition-colors">
-                <MoreHorizontal size={16} />
-            </button>
         </div>
     )
 }
 
 function SectionHeader({ title, action }: { title: string, action?: React.ReactNode }) {
     return (
-        <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">{title}</h3>
             {action}
         </div>
     )
@@ -318,83 +347,92 @@ export default function DashboardPage() {
   }, [todaysAttendance, classes]);
 
   return (
-    <div className="bg-slate-50 min-h-screen px-4 md:px-6">
-      <div className="space-y-6 pb-20 pt-4 max-w-[1400px] mx-auto">
+    <div className="bg-[#F3F4F6] min-h-screen px-4 md:px-0 font-sans">
+      <div className="space-y-8 pb-20 pt-4 max-w-[1800px] mx-auto overflow-x-hidden">
       
       {/* Header Row: Title on Left, Actions on Right */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          {/* Left: Dashboard Title */}
-          <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
-              <p className="text-xs text-slate-500">Overview of students, revenue, and activity</p>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/40 backdrop-blur-md p-6 rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-[0_12px_24px_-8px_rgba(79,70,229,0.4)] shrink-0 transition-transform hover:scale-105 duration-300">
+                  {typeof LayoutGrid !== 'undefined' ? <LayoutGrid size={28} /> : <Users size={28} />}
+              </div>
+              <div>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">Dashboard</h1>
+                  <p className="text-sm font-medium text-slate-500">School growth and activity at a glance</p>
+              </div>
           </div>
-          
-          {/* Right: Action Buttons */}
-          <div className="flex items-center gap-3">
-              <button 
-                  onClick={() => router.push('/admin/students/add')}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200 flex items-center gap-2"
-              >
-                  <UserPlus size={18} />
-                  <span className="hidden sm:inline">Add Student</span>
-              </button>
+
+          <div className="flex flex-wrap items-center gap-3">
               <button 
                   onClick={() => router.push('/admin/attendance')}
-                  className="flex items-center gap-2 px-5 py-3 bg-white text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all shadow-sm border border-slate-200"
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-slate-700 rounded-2xl font-black text-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all border border-slate-100 group w-full sm:w-auto active:scale-95"
               >
-                  <Users size={18} />
+                  <Calendar size={18} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
                   <span>Track Attendance</span>
+              </button>
+              <button 
+                  onClick={() => router.push('/admin/students/add')}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 shadow-[0_12px_24px_-8px_rgba(79,70,229,0.4)] transition-all hover:-translate-y-0.5 active:scale-95"
+              >
+                  <Plus size={20} />
+                  <span>Add Student</span>
               </button>
           </div>
       </div>
       
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard 
-             title="Active Students" 
-             value={activeStudents.toLocaleString()} 
-             icon={Users}
-             iconBgClass="bg-emerald-50"
-             colorClass="text-emerald-600"
-             isPrimary={true}
+              title="Active Students" 
+              value={activeStudents} 
+              icon={Users} 
+              colorClass="text-indigo-600" 
+              iconBgClass="bg-indigo-50"
+              isPrimary
+              trend="up"
+              trendValue="12.5%"
           />
           <MetricCard 
-             title="Inactive Students" 
-             value={(students.length - activeStudents).toLocaleString()} 
-             icon={Users}
-             iconBgClass="bg-slate-50"
-             colorClass="text-slate-500"
+              title="Inactive Students" 
+              value={students.length - activeStudents} 
+              icon={UserPlus} 
+              colorClass="text-blue-500" 
+              iconBgClass="bg-blue-50" 
+              trend="down"
+              trendValue="2.1%"
           />
           <MetricCard 
-             title="Total Revenue" 
-             value={`$${totalRevenue.toLocaleString()}`} 
-             icon={Wallet}
-             iconBgClass="bg-orange-50"
-             colorClass="text-orange-500"
+              title="Total Revenue" 
+              value={`$${totalRevenue.toLocaleString()}`} 
+              icon={Wallet} 
+              colorClass="text-emerald-500" 
+              iconBgClass="bg-emerald-50" 
+              trend="up"
+              trendValue="8.4%"
           />
           <MetricCard 
-             title="Insurance" 
-             value="0" 
-             icon={Shield}
-             iconBgClass="bg-blue-50"
-             colorClass="text-blue-600"
+              title="Insurance" 
+              value="0" 
+              icon={Shield} 
+              colorClass="text-rose-500" 
+              iconBgClass="bg-rose-50" 
           />
       </div>
 
       {/* Middle Section: Trends & Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* Main Chart: Admission Trends */}
-          <div className="lg:col-span-8 bg-white p-6 rounded-[20px] shadow-sm border border-slate-100 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+          <div className="lg:col-span-8 bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100/50 transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
               <SectionHeader 
                 title="Student Admission Trends" 
                 action={
-                   <div className="flex bg-slate-50 p-1 rounded-lg">
+                   <div className="flex bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/30">
                       {['Week', 'Month', 'Year'].map((filter) => (
                            <button 
                                 key={filter}
                                 onClick={() => setTrendFilter(filter as any)}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${trendFilter === filter ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                className={`px-5 py-2 rounded-xl text-xs font-black transition-all duration-300 ${trendFilter === filter ? 'bg-white shadow-xl shadow-slate-200/50 text-indigo-600 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
                            >
                                 {filter}
                            </button>
@@ -402,7 +440,7 @@ export default function DashboardPage() {
                    </div>
                 } 
               />
-              <div className="h-[300px] w-full">
+              <div className="h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={admissionTrendData} barSize={18} barGap={6}>
                           <CartesianGrid strokeDasharray="2 4" vertical={false} stroke="#f1f5f9" />
@@ -425,14 +463,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Donut Chart: Students by Branch */}
-          <div className="lg:col-span-4 bg-white p-6 rounded-[20px] shadow-sm border border-slate-100 flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+          <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100/50 flex flex-col transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
               <SectionHeader title="Students by Branch" />
-              <div className="flex flex-col items-center">
-                  <div className="h-[200px] w-full relative">
+              <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="h-[220px] w-full relative">
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                          <div className="text-center">
-                              <span className="text-3xl font-black text-slate-800">{activeStudents}</span>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</p>
+                          <div className="text-center group">
+                              <span className="text-4xl font-black text-slate-800 transition-transform group-hover:scale-110 block">{activeStudents}</span>
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Total</p>
                           </div>
                       </div>
                       <ResponsiveContainer width="100%" height="100%">
@@ -456,9 +494,9 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Legend */}
-                  <div className="flex flex-wrap justify-center gap-2 mt-2 w-full">
+                  <div className="flex flex-wrap justify-center gap-2 mt-4 w-full">
                       {branchData.map((d, i) => (
-                          <div key={i} className="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                          <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 flex-1 min-w-[120px] justify-center sm:justify-start">
                               <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }}></span>
                               <div className="flex flex-col leading-none">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{d.name}</span>
@@ -473,27 +511,29 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
           
           {/* Attendance Line Chart */}
-          <div className="md:col-span-2 bg-white p-6 rounded-[20px] shadow-sm border border-slate-100 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+          <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100/50 transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
                <SectionHeader 
                     title="Attendance Today" 
-                    action={<span className="text-xs font-bold text-slate-400">Total Check-ins</span>}
+                    action={<span className="text-xs font-black text-slate-400 uppercase tracking-widest">Live Updates</span>}
                />
-               <div className="h-[200px] mt-4">
+               <div className="h-[250px] mt-4">
                    <ResponsiveContainer width="100%" height="100%">
                        <AreaChart data={attendanceData}>
                            <defs>
                                <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                   <stop offset="5%" stopColor="#f97316" stopOpacity={0.1}/>
+                                   <stop offset="5%" stopColor="#f97316" stopOpacity={0.15}/>
                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                                </linearGradient>
                            </defs>
-                           <CartesianGrid strokeDasharray="2 4" stroke="#f1f5f9" />
+                           <CartesianGrid strokeDasharray="2 4" stroke="#f1f5f9" vertical={false} />
                             <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
-                           <Tooltip contentStyle={{borderRadius: '12px', border: 'none'}} />
-                           <Area type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCount)" dot={false} />
+                           <Tooltip 
+                            contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)'}} 
+                           />
+                           <Area type="monotone" dataKey="count" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" dot={{r: 4, fill: '#f97316', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
                        </AreaChart>
                    </ResponsiveContainer>
                </div>

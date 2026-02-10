@@ -87,8 +87,8 @@ export default function AdminLayout({
         </header>
 
         {/* Scrollable Main Area */}
-        <main className="flex-1 px-6 md:px-10 pb-10 relative">
-           <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <main className="flex-1 px-4 md:px-10 pb-10 relative">
+           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
              {children}
            </div>
         </main>

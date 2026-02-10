@@ -9,7 +9,8 @@ import {
   Users, 
   Plus, 
   Search, 
-  Filter 
+  Filter,
+  Calendar
 } from "lucide-react";
 
 import { AddInsuranceModal } from "@/components/modals/AddInsuranceModal";
@@ -58,13 +59,13 @@ export default function InsurancePage() {
                     startDate: info.start_date,
                     endDate: info.end_date,
                     coverageAmount: info.coverage_amount,
-                    status: isExpired ? 'Expired' : 'Active'
+                    status: isExpired ? 'Inactive' : 'Active'
                 };
             })
             .sort((a, b) => {
-                // Sort Expired first
-                if (a.status === 'Expired' && b.status !== 'Expired') return -1;
-                if (a.status !== 'Expired' && b.status === 'Expired') return 1;
+                // Sort Inactive first
+                if (a.status === 'Inactive' && b.status !== 'Inactive') return -1;
+                if (a.status !== 'Inactive' && b.status === 'Inactive') return 1;
                 return 0; // Keep original order otherwise
             });
         setPolicies(extractedPolicies);
@@ -95,18 +96,27 @@ export default function InsurancePage() {
   return (
     <div className="space-y-8">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Student Insurance</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage policies and coverage details</p>
-        </div>
-        <button 
-            onClick={() => setShowModal(true)}
-            className="primary flex items-center gap-2 shadow-indigo-500/20 bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition-all font-bold"
-        >
-          <Plus size={18} />
-          <span>Add Insurance</span>
-        </button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-6">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 animate-in zoom-in-95 duration-500">
+                  <ShieldCheck size={24} />
+              </div>
+              <div>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">Insurance </h1>
+                  <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Insurance Management</span>
+                      <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{policies.length} Active Insurance</span>
+                  </div>
+              </div>
+          </div>
+          <button 
+              onClick={() => setShowModal(true)}
+              className="flex items-center justify-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 w-full md:w-auto"
+          >
+            <Plus size={20} />
+            <span>Protect New Student</span>
+          </button>
       </div>
 
       <AddInsuranceModal 
@@ -118,101 +128,114 @@ export default function InsurancePage() {
       />
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-6 items-center justify-between bg-transparent">
-         {/* Custom Rounded Search UI */}
-         <div className="relative w-full md:w-[310px]">
-            <input 
-                placeholder="Search..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-6 pr-12 py-3 bg-white border border-slate-200 rounded-full font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm" 
-            />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-         </div>
+      <div className="bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border border-white/50 shadow-sm transition-all duration-300">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+             {/* Custom Rounded Search UI */}
+             <div className="relative group flex-1 w-full md:max-w-md">
+                <input 
+                    placeholder="Search students, insurance ID..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-16 py-3.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all placeholder:text-slate-400 shadow-sm" 
+                />
+                <div className="absolute inset-y-0 right-6 flex items-center pointer-events-none">
+                    <Search className="text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                </div>
+             </div>
 
-         {/* Filter Tabs */}
-         <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-            {['All', 'Active', 'Expired'].map((tab) => (
-                <button 
-                    key={tab}
-                    onClick={() => setFilter(tab)}
-                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all
-                        ${filter === tab 
-                            ? 'bg-slate-800 text-white shadow-md' 
-                            : 'text-slate-500 hover:bg-slate-50'
-                        }
-                    `}
-                >
-                    {tab}
-                </button>
-            ))}
-         </div>
+             {/* Filter Tabs */}
+             <div className="flex bg-slate-100/50 p-1.5 rounded-[1.25rem] border border-slate-200/30 w-full md:w-auto">
+                {['All', 'Active', 'Inactive'].map((tab) => (
+                    <button 
+                        key={tab}
+                        onClick={() => setFilter(tab)}
+                        className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all
+                            ${filter === tab 
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                                : 'text-slate-400 hover:text-slate-600 hover:bg-white'
+                            }
+                        `}
+                    >
+                        {tab === 'All' ? 'All Insurance' : tab}
+                    </button>
+                ))}
+             </div>
+          </div>
       </div>
 
       {/* Policies Table */}
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                    <tr>
-                        <th className="px-6 py-4">Student</th>
-                        <th className="px-6 py-4">Insurance No.</th>
-                        <th className="px-6 py-4">Start Date</th>
-                        <th className="px-6 py-4">Expired Date</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4 text-right">Actions</th>
+      <div className="bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/50 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left">
+                <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100 uppercase tracking-widest text-[9px] font-black text-slate-400">
+                        <th className="px-8 py-4">Insured Student</th>
+                        <th className="px-8 py-4">Insurance Identifier</th>
+                        <th className="px-8 py-4 text-center">Expired Date</th>
+                        <th className="px-8 py-4 text-center">Current Status</th>
+                        <th className="px-8 py-4 text-right">Action</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100/50">
                     {filteredPolicies.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">
-                                No insurance policies found.
+                            <td colSpan={5} className="px-8 py-20 text-center">
+                                <div className="flex flex-col items-center gap-3">
+                                    <ShieldCheck className="text-slate-200" size={48} />
+                                    <p className="text-slate-400 font-black text-xs uppercase tracking-widest">No matching portfolios found</p>
+                                </div>
                             </td>
                         </tr>
                     ) : filteredPolicies.map((policy) => (
-                        <tr key={policy.id} className="group hover:bg-slate-50/50 transition-colors">
-                             <td className="px-6 py-4">
-                                 <div className="flex items-center gap-3">
-                                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
+                        <tr key={policy.id} className="group hover:bg-white/80 transition-all duration-300">
+                             <td className="px-8 py-4">
+                                 <div className="flex items-center gap-4">
+                                     <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-black shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all group-hover:rotate-6">
                                          {policy.studentName.charAt(0)}
                                      </div>
                                      <div>
-                                         <p className="font-bold text-slate-800 text-sm">{policy.studentName}</p>
-                                         <p className="text-[10px] text-slate-400 font-bold">{policy.studentId}</p>
+                                         <p className="font-black text-slate-900 group-hover:text-indigo-600 transition-colors text-[13px] tracking-tight">{policy.studentName}</p>
+                                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{policy.studentId}</p>
                                      </div>
                                  </div>
                              </td>
-                             <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
-                                        <ShieldCheck size={16} />
+                              <td className="px-8 py-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-7 h-7 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                        <ShieldCheck size={14} />
                                     </div>
-                                    <span className="font-bold text-slate-700 text-xs">{policy.policyNumber}</span>
+                                    <div>
+                                        <p className="font-black text-slate-700 text-xs tracking-tight">{policy.policyNumber}</p>
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{policy.provider}</p>
+                                    </div>
                                 </div>
                              </td>
-                             <td className="px-6 py-4 text-sm font-bold text-slate-600">
-                                 {policy.startDate}
+                             <td className="px-8 py-4 text-center">
+                                 <div className="flex flex-col items-center gap-1">
+                                     <div className="flex items-center gap-1.5 text-[11px] font-black text-slate-700 uppercase tracking-tight bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                                         <Calendar size={12} className="text-rose-400" />
+                                         <span>{policy.endDate}</span>
+                                     </div>
+                                 </div>
                              </td>
-                             <td className="px-6 py-4 text-sm font-bold text-slate-600">
-                                 {policy.endDate}
+                             <td className="px-8 py-4">
+                                 <div className="flex justify-center">
+                                     <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border shadow-sm ${
+                                         policy.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-50' : 
+                                         policy.status === 'Inactive' ? 'bg-rose-50 text-rose-500 border-rose-100 shadow-rose-50' :
+                                         'bg-amber-50 text-amber-600 border-amber-100 shadow-amber-50'
+                                     }`}>
+                                         {policy.status}
+                                     </span>
+                                 </div>
                              </td>
-                             <td className="px-6 py-4">
-                                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                     policy.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
-                                     policy.status === 'Expired' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
-                                     'bg-amber-50 text-amber-600 border border-amber-100'
-                                 }`}>
-                                     {policy.status}
-                                 </span>
-                             </td>
-                             <td className="px-6 py-4 text-right">
-                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="View Details">
-                                         <Search size={16} />
+                             <td className="px-8 py-4 text-right">
+                                 <div className="flex items-center justify-end gap-1.5">
+                                     <button className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-white transition-all border border-transparent hover:border-indigo-100 shadow-sm hover:shadow-md" title="View Details">
+                                         <Search size={15} />
                                      </button>
-                                     <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Edit">
-                                         <Filter size={16} /> 
+                                     <button className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-emerald-600 bg-slate-50 hover:bg-white transition-all border border-transparent hover:border-emerald-100 shadow-sm hover:shadow-md" title="Edit Portfolio">
+                                         <Filter size={15} /> 
                                      </button>
                                  </div>
                              </td>

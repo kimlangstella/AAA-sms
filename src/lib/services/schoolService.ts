@@ -11,6 +11,7 @@ import {
     query,
     where,
     orderBy,
+    limit,
     Timestamp,
     onSnapshot
 } from "firebase/firestore";
@@ -151,6 +152,32 @@ export const getStudentById = async (id: string) => {
     }
 };
 
+/**
+ * Checks if a phone number already exists in the students collection,
+ * searching across both student 'phone' and 'parent_phone' fields.
+ */
+export const checkPhoneDuplicate = async (phone: string) => {
+    try {
+        const cleanedPhone = phone.replace(/\D/g, '');
+        if (!cleanedPhone) return [];
+
+        // Check student phone
+        const q1 = query(studentsCol, where("phone", "==", phone));
+        const q2 = query(studentsCol, where("parent_phone", "==", phone));
+
+        const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+        const duplicates = new Map();
+        snap1.docs.forEach(doc => duplicates.set(doc.id, { id: doc.id, ...doc.data() }));
+        snap2.docs.forEach(doc => duplicates.set(doc.id, { id: doc.id, ...doc.data() }));
+
+        return Array.from(duplicates.values());
+    } catch (error) {
+        console.error("Error checking phone duplicate:", error);
+        return [];
+    }
+};
+
 // --- Enrollment Services ---
 
 export const addEnrollment = async (data: any) => {
@@ -241,12 +268,13 @@ export const getEnrollmentsByStudent = async (studentId: string): Promise<Enroll
     } as Enrollment));
 };
 
-// Deactivate all enrollments for a student (when status changes to Inactive/Hold)
-export const deactivateStudentEnrollments = async (studentId: string): Promise<void> => {
+// Deactivate or Hold all enrollments for a student
+export const deactivateStudentEnrollments = async (studentId: string, status: 'Inactive' | 'Hold' = 'Inactive'): Promise<void> => {
     const enrollments = await getEnrollmentsByStudent(studentId);
     const updatePromises = enrollments.map(enrollment =>
         updateDoc(doc(db, "enrollments", enrollment.enrollment_id), {
-            status: "Inactive",
+            enrollment_status: status, // Use enrollment_status for consistency
+            status: status, // Keep status as backup
             updated_at: Timestamp.now()
         })
     );
@@ -484,4 +512,40 @@ export const subscribeToDailyAttendance = (date: string, callback: (attendance: 
     }, (error) => {
         console.error("Error subscribing to daily attendance:", error);
     });
+};
+// Get the last recorded session number for a class (to auto-fill enrollment start)
+// Get the last recorded session number for a class (to auto-fill enrollment start)
+export const getLastSessionForClass = async (classId: string, termId?: string) => {
+    try {
+        // Query ALL attendance records for this class (Client-side filtering to avoid index)
+        const q = query(
+            attendanceCol,
+            where("class_id", "==", classId)
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return 0;
+
+        // Map to session numbers
+        const sessions = snapshot.docs.map(doc => {
+            const data = doc.data();
+            // Handle possible string/number types
+            return Number(data.session_number || 0);
+        });
+
+        // Filter valid sessions (greater than 0)
+        // If termId is provided, we could filter here too if the data had term_id, but for now we look at all sessions for class
+        const validSessions = sessions.filter(s => s > 0 && !isNaN(s));
+
+        if (validSessions.length === 0) return 0;
+
+        // Find max (Last Session)
+        return Math.max(...validSessions);
+
+    } catch (error) {
+        // Fallback if index missing or error
+        console.error("Error fetching last session:", error);
+        return 0;
+    }
 };

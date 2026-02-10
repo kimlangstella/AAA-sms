@@ -57,52 +57,46 @@ function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: 
   };
 
   return (
-    <div onClick={onClick} className="bg-white rounded-3xl p-6 border border-slate-100/60 shadow-[0_2px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:border-slate-200 transition-all cursor-pointer group flex flex-col justify-between h-full relative overflow-hidden">
-       
+    <div onClick={onClick} className="bg-white/60 backdrop-blur-md rounded-[1.75rem] p-6 border border-white/50 shadow-sm hover:shadow-xl hover:shadow-indigo-100/30 hover:scale-[1.02] hover:border-indigo-100 transition-all cursor-pointer group flex flex-col justify-between h-full relative overflow-hidden active:scale-95">
        <div className="flex justify-between items-start mb-6">
           <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white flex-shrink-0">
-                  <div className="bg-white/20 p-2 rounded-full">
-                     <Users size={20} />
-                  </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-all group-hover:bg-indigo-600 group-hover:text-white flex-shrink-0 group-hover:rotate-6 shadow-inner">
+                   <Users size={20} />
               </div>
               <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1 break-words">{cls.className}</h3>
-              <div className="flex flex-col gap-1.5 mt-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                     <Calendar size={12} className="flex-shrink-0 text-slate-400" />
-                     <span className="truncate">{Array.isArray(cls.days) ? cls.days.join(" • ") : cls.days}</span>
-                  </div>
-                  {(cls.startTime && cls.endTime) && (
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                         <Clock size={12} className="flex-shrink-0 text-slate-400" />
-                         <span className="truncate">{cls.startTime} - {cls.endTime}</span>
-                      </div>
-                  )}
-                  {/* Branch Name Display */}
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full w-fit">
-                     <Building2 size={10} className="flex-shrink-0" />
-                     <span className="truncate">{branchName}</span>
+                  <h3 className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1 break-words tracking-tight">{cls.className}</h3>
+                  <div className="flex flex-col gap-1.5 mt-2">
+                       <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                          <Calendar size={12} className="flex-shrink-0 text-slate-300" />
+                          <span className="truncate">{Array.isArray(cls.days) ? cls.days.join(" • ") : cls.days}</span>
+                       </div>
+                       {(cls.startTime && cls.endTime) && (
+                           <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                              <Clock size={12} className="flex-shrink-0 text-slate-300" />
+                              <span className="truncate">{cls.startTime} - {cls.endTime}</span>
+                           </div>
+                       )}
+                       <div className="flex items-center gap-1.5 text-[9px] font-black text-indigo-500 bg-indigo-50/50 border border-indigo-100/30 px-2.5 py-1 rounded-lg w-fit mt-1">
+                          <Building2 size={10} className="flex-shrink-0" />
+                          <span className="truncate uppercase tracking-widest leading-none">{branchName}</span>
+                       </div>
                   </div>
               </div>
           </div>
-      </div>
           
-          <div className="flex items-center gap-2 flex-shrink-0">
-             <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${isFull ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                {isFull ? 'FULL' : 'OPEN'}
-             </div>
+          <div className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border ${isFull ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-50 shadow-md'}`}>
+             {isFull ? 'FULL' : 'OPEN'}
           </div>
        </div>
 
        <div className="space-y-4">
           <div className="flex justify-between items-end">
               <div>
-                  <span className="text-3xl font-black text-slate-900">{count}</span>
-                  <span className="text-xs font-bold text-slate-400 ml-1">Students</span>
+                  <span className="text-2xl font-black text-slate-900">{count}</span>
+                  <span className="text-[10px] font-bold text-slate-400 ml-1 uppercase tracking-wider">Students</span>
               </div>
               <div className="text-right">
-                  <span className="text-xs font-bold text-slate-400">Target: {capacity}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target: {capacity}</span>
               </div>
           </div>
           
@@ -155,6 +149,68 @@ function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: 
     </div>
   );
 }
+
+function ClassListRow({ cls, enrollments, onClick, onEdit, onDelete, branchName }: { cls: Class, enrollments: Enrollment[], onClick: () => void, onEdit: () => void, onDelete: () => void, branchName: string }) {
+  const activeEnrollments = enrollments.filter(e => e.class_id === cls.class_id);
+  const count = activeEnrollments.length;
+  const capacity = cls.maxStudents || 0;
+  const isFull = capacity > 0 && count >= capacity;
+
+  return (
+    <div onClick={onClick} className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white/50 shadow-sm hover:shadow-lg hover:shadow-indigo-100/20 transition-all cursor-pointer group flex items-center justify-between gap-6 active:scale-[0.99]">
+       <div className="flex items-center gap-4 flex-1">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-all group-hover:bg-indigo-600 group-hover:text-white flex-shrink-0">
+               <Users size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-1">{cls.className}</h3>
+              <div className="flex items-center gap-4 mt-1">
+                   <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                      <Calendar size={12} className="text-slate-300" />
+                      <span>{Array.isArray(cls.days) ? cls.days.join(" • ") : cls.days}</span>
+                   </div>
+                   {(cls.startTime && cls.endTime) && (
+                       <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          <Clock size={12} className="text-slate-300" />
+                          <span>{cls.startTime} - {cls.endTime}</span>
+                       </div>
+                   )}
+                   <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">{branchName}</span>
+              </div>
+          </div>
+       </div>
+
+       <div className="flex items-center gap-8">
+           <div className="flex flex-col items-center">
+               <span className="text-sm font-black text-slate-800">{count} / {capacity}</span>
+               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Students</span>
+           </div>
+           
+           <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border ${isFull ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+              {isFull ? 'FULL' : 'OPEN'}
+           </div>
+
+           <div className="flex items-center gap-1 pr-2">
+              <button 
+                 onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-amber-600 hover:bg-amber-50 transition-all"
+                 title="Edit Class"
+              >
+                  <Pencil size={14} />
+              </button>
+              <button 
+                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                 title="Delete Class"
+              >
+                  <Trash2 size={14} />
+              </button>
+           </div>
+       </div>
+    </div>
+  );
+}
+
 
 function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: Enrollment; onRemove: () => void; onViewInvoice: () => void }) {
   const student = enrollment.student;
@@ -575,7 +631,7 @@ export default function EnrollmentsPage() {
     }
   }
 
-  // Rollover students from inactive term to active term
+  // Move students from inactive term to active term
   async function handleRollover() {
     if (!selectedClass || !activeTerm || rolloverStudentIds.length === 0) return;
     
@@ -607,9 +663,9 @@ export default function EnrollmentsPage() {
         setShowRolloverModal(false);
         setRolloverStudentIds([]);
         setFilterTerm(""); // Switch to active term view
-        alert(`Successfully enrolled ${enrollPromises.length} students in ${activeTerm.term_name}!`);
+        alert(`Successfully moved ${enrollPromises.length} students to ${activeTerm.term_name}!`);
     } catch (err) {
-        alert("Failed to rollover students.");
+        alert("Failed to move students.");
     } finally {
         setIsSubmitting(false);
     }
@@ -666,20 +722,19 @@ export default function EnrollmentsPage() {
                             ))}
                         </select>
                     </div>
-                    
-                    {/* Rollover Button - only show when viewing inactive term */}
-                    {canRollover && (
-                        <button 
-                            onClick={() => {
-                                setRolloverStudentIds(classRoster.map(r => r.student_id));
-                                setShowRolloverModal(true);
-                            }}
-                            className="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-xs hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 flex items-center gap-2"
-                        >
-                            <ArrowRight size={16} />
-                            <span>Rollover to {activeTerm?.term_name}</span>
-                        </button>
-                    )}
+                                        {/* Transfer Button - only show when viewing inactive term */}
+                     {canRollover && (
+                         <button 
+                             onClick={() => {
+                                 setRolloverStudentIds(classRoster.map(r => r.student_id));
+                                 setShowRolloverModal(true);
+                             }}
+                             className="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-xs hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 flex items-center gap-2"
+                         >
+                             <ArrowRight size={16} />
+                             <span>Move to {activeTerm?.term_name}</span>
+                         </button>
+                     )}
                     
                     {/* Add Student - only when viewing active term */}
                     {!filterTerm && (
@@ -789,14 +844,14 @@ export default function EnrollmentsPage() {
                 </div>
             )}
 
-            {/* ROLLOVER MODAL */}
+            {/* TRANSFER MODAL */}
             {showRolloverModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 bg-slate-50">
-                            <h2 className="text-xl font-bold text-slate-900">Rollover Students</h2>
-                            <p className="text-xs text-slate-400">Continue students to {activeTerm?.term_name}</p>
-                        </div>
+                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
+                         <div className="p-6 border-b border-slate-100 bg-slate-50">
+                             <h2 className="text-xl font-bold text-slate-900">Transfer Students</h2>
+                             <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Move students to {activeTerm?.term_name}</p>
+                         </div>
                         
                         <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
                             {classRoster.map(item => (
@@ -823,14 +878,14 @@ export default function EnrollmentsPage() {
                         
                         <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
                             <button onClick={() => setShowRolloverModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-100 text-sm">Cancel</button>
-                            <button 
-                                onClick={handleRollover}
-                                disabled={isSubmitting || rolloverStudentIds.length === 0}
-                                className="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 shadow-lg shadow-amber-100 disabled:opacity-50 text-sm flex items-center gap-2"
-                            >
-                                {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
-                                Rollover
-                            </button>
+                             <button 
+                                 onClick={handleRollover} 
+                                 disabled={isSubmitting || rolloverStudentIds.length === 0} 
+                                 className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                             >
+                                 {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Check size={18} />}
+                                 <span>Move Students (Unpaid)</span>
+                             </button>
                         </div>
                     </div>
                 </div>
@@ -847,72 +902,79 @@ export default function EnrollmentsPage() {
 
    /* RENDER: ENROLLMENT VIEW */
   return (
-    <div className="space-y-8 pb-20 max-w-[98%] mx-auto">
-       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-             <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-                {showAddClassModal ? 'Create New Class' : 'Enrollments'}
-             </h1>
-             <p className="text-slate-400 font-bold text-sm">
-                {showAddClassModal ? 'Setup and configure a new class roster' : 'Manage academic classes and student rosters'}
-             </p>
+    <div className="space-y-6 pb-20 max-w-[1800px] mx-auto px-4 md:px-0">
+       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 animate-in zoom-in-95 duration-500">
+                  <Users size={20} className="lg:scale-125" />
+              </div>
+              <div>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                    {showAddClassModal ? 'Create Class' : 'Enrollments Management'}
+                  </h1>
+                  <div className="flex items-center gap-2 mt-0.5 sm:mt-1">
+                      <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Academic Operations</span>
+                      <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-slate-300"></div>
+                      <span className="text-[9px] sm:text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                        {showAddClassModal ? 'New Roster Entry' : 'Roster Board'}
+                      </span>
+                  </div>
+              </div>
           </div>
           
-          <div className="flex items-center gap-3">
-             <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
-                <button 
-                   onClick={() => handleTabChange(false)}
-                   className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${!showAddClassModal ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                   Classes
-                </button>
-                <button 
-                   onClick={() => handleTabChange(true)} 
-                   className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${showAddClassModal ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                   Add Class
-                </button>
-             </div>
-
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
              {!showAddClassModal && (
-                <div className="flex bg-white rounded-2xl p-1 border border-slate-100 shadow-sm">
-                   <button 
-                      onClick={() => setView('grid')} 
-                      className={`p-2 rounded-xl transition-all ${view === 'grid' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                      title="Grid View"
-                   >
-                      <LayoutGrid size={18} />
-                  </button>
-                   <button 
-                      onClick={() => setView('list')} 
-                      className={`p-2 rounded-xl transition-all ${view === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                      title="List View"
-                   >
-                      <LayoutList size={18} />
-                  </button>
-                </div>
+                <>
+                    <button 
+                       onClick={() => handleTabChange(true)}
+                       className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
+                    >
+                       <Plus size={18} />
+                       <span>Create Class</span>
+                    </button>
+
+                    <div className="flex bg-white/60 backdrop-blur-md rounded-[1.25rem] sm:rounded-[1.5rem] p-1 border border-slate-200/50 shadow-sm w-full sm:w-auto justify-center">
+                       <button 
+                          onClick={() => setView('grid')} 
+                          className={`p-2 sm:p-3 rounded-[0.9rem] sm:rounded-[1.125rem] transition-all ${view === 'grid' ? 'bg-indigo-50 text-indigo-600 shadow-inner' : 'text-slate-400 hover:text-slate-600'}`}
+                          title="Grid View"
+                       >
+                          <LayoutGrid size={18} className="sm:hidden" />
+                          <LayoutGrid size={20} className="hidden sm:block" />
+                      </button>
+                       <button 
+                          onClick={() => setView('list')} 
+                          className={`p-2 sm:p-3 rounded-[0.9rem] sm:rounded-[1.125rem] transition-all ${view === 'list' ? 'bg-indigo-50 text-indigo-600 shadow-inner' : 'text-slate-400 hover:text-slate-600'}`}
+                          title="List View"
+                       >
+                          <LayoutList size={18} className="sm:hidden" />
+                          <LayoutList size={20} className="hidden sm:block" />
+                      </button>
+                    </div>
+                </>
              )}
           </div>
        </div>
 
        {showAddClassModal ? (
-           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                             <Plus size={20} />
+           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+               <div className="px-5 py-4 sm:px-8 sm:py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                             <Plus size={16} className="sm:hidden" />
+                             <Plus size={20} className="hidden sm:block" />
                         </div>
-                        <h2 className="text-lg font-bold text-slate-900">Create New Class</h2>
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900">Create New Class</h2>
                     </div>
                </div>
-               <div className="p-8">
+               <div className="p-4 sm:p-8">
                    <CreateClassForm onCancel={() => handleTabChange(false)} onSuccess={() => handleTabChange(false)} />
                </div>
            </div>
         ) : (
-           <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
                {/* Search and Filters Toolbar */}
-               <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+               <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100">
                    {/* Search */}
                    <div className="relative w-full md:w-[310px]">
                        <input
@@ -920,9 +982,10 @@ export default function EnrollmentsPage() {
                            placeholder="Search..."
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
-                           className="w-full pl-6 pr-12 py-3 bg-white border border-slate-200 rounded-full font-bold text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm"
+                           className="w-full pl-5 pr-10 py-2.5 sm:pl-6 sm:pr-12 sm:py-3 bg-white border border-slate-200 rounded-full font-bold text-xs sm:text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all placeholder:text-slate-400 shadow-sm"
                        />
-                       <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                       <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} className="sm:hidden" />
+                       <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hidden sm:block" size={18} />
                    </div>
 
                    <div className="flex flex-wrap items-center gap-3">
@@ -976,19 +1039,36 @@ export default function EnrollmentsPage() {
                </div>
 
                {/* Class Grid */}
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredClasses.map(cls => (
-                     <ClassCard 
-                        key={cls.class_id} 
-                        cls={cls} 
-                        enrollments={termEnrollments} 
-                        onClick={() => setSelectedClass(cls)} 
-                        onEdit={() => setEditingClass(cls)}
-                        onDelete={() => handleDeleteClass(cls.class_id)}
-                        branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
-                     />
-                  ))}
-               </div>
+               {/* Class Grid/List Toggle */}
+               {view === 'grid' ? (
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredClasses.map(cls => (
+                         <ClassCard 
+                            key={cls.class_id} 
+                            cls={cls} 
+                            enrollments={termEnrollments} 
+                            onClick={() => setSelectedClass(cls)} 
+                            onEdit={() => setEditingClass(cls)}
+                            onDelete={() => handleDeleteClass(cls.class_id)}
+                            branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
+                         />
+                      ))}
+                   </div>
+               ) : (
+                   <div className="space-y-3">
+                      {filteredClasses.map(cls => (
+                         <ClassListRow 
+                            key={cls.class_id} 
+                            cls={cls} 
+                            enrollments={termEnrollments} 
+                            onClick={() => setSelectedClass(cls)} 
+                            onEdit={() => setEditingClass(cls)}
+                            onDelete={() => handleDeleteClass(cls.class_id)}
+                            branchName={branches.find(b => b.branch_id === cls.branchId)?.branch_name || 'Unknown'}
+                         />
+                      ))}
+                   </div>
+               )}
            </div>
         )}
 

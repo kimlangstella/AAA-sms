@@ -93,13 +93,13 @@ export function AttendanceCell({ record, onChange, readOnly }: AttendanceCellPro
   const getStyle = () => {
     // Check for specific reasons first
     if ((selectedStatus === "Present" || record?.status === "Present") && (record?.reason === "Make-up" || record?.reason === "Make-up Class" || noteValue.includes("Make-up"))) {
-       return "bg-blue-50 border-blue-300 text-blue-700 font-black";
+       return "bg-indigo-50 border-indigo-200 text-indigo-700 font-black shadow-inner shadow-indigo-100/50";
     }
 
-    if (selectedStatus === "Present") return "bg-emerald-50 border-emerald-300 text-emerald-700 font-bold";
-    if (selectedStatus === "Absent") return "bg-rose-50 border-rose-300 text-rose-700 font-bold";
-    if (selectedStatus === "Permission") return "bg-amber-50 border-amber-300 text-amber-700 font-bold";
-    return "bg-white border-slate-200 text-slate-400";
+    if (selectedStatus === "Present") return "bg-emerald-50 border-emerald-200 text-emerald-700 font-black shadow-inner shadow-emerald-50";
+    if (selectedStatus === "Absent") return "bg-rose-50 border-rose-200 text-rose-700 font-black shadow-inner shadow-rose-50";
+    if (selectedStatus === "Permission") return "bg-amber-50 border-amber-200 text-amber-700 font-black shadow-inner shadow-amber-50";
+    return "bg-white border-slate-100 text-slate-300 hover:border-slate-300 transition-colors";
   };
 
   const getDisplayText = () => {
@@ -159,7 +159,7 @@ export function AttendanceCell({ record, onChange, readOnly }: AttendanceCellPro
     <div className="flex justify-center relative">
       <div className="relative">
         <div 
-            className={`w-16 h-10 flex items-center justify-center font-bold text-sm rounded-lg border-2 transition-all ${getStyle()}`}
+            className={`w-16 h-10 flex items-center justify-center text-sm rounded-xl border transition-all duration-300 ${getStyle()}`}
             title={getStatusLabel()}
         >
           {getDisplayText()}
@@ -199,56 +199,65 @@ export function AttendanceCell({ record, onChange, readOnly }: AttendanceCellPro
                 onClick={cancelLeaveNote}
             />
             {/* Centered Modal */}
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white p-4 rounded-2xl shadow-2xl border border-slate-200 w-80 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-2">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${selectedStatus === 'Make-up' ? 'bg-blue-500' : 'bg-amber-500'}`}></span>
-                    {selectedStatus === 'Make-up' ? 'Make-up Reason' : 'Leave Reason'}
+            {/* Centered Modal */}
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white/95 backdrop-blur-2xl p-8 rounded-[2.5rem] shadow-[0_25px_80px_rgba(0,0,0,0.15)] border border-white/50 w-[400px] animate-in fade-in zoom-in-95 duration-300">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${selectedStatus === 'Make-up' ? 'bg-indigo-500 shadow-lg shadow-indigo-200' : 'bg-amber-500 shadow-lg shadow-amber-200'}`}></div>
+                        {selectedStatus === 'Make-up' ? 'Make-up Recording' : 'Leave Verification'}
+                    </div>
                 </div>
-            </div>
-            {selectedStatus === 'Make-up' && (
-                <div className="mb-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                        Original Class Date
+
+                {selectedStatus === 'Make-up' && (
+                    <div className="mb-6">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">
+                            Original Absence Date
+                        </label>
+                        <input 
+                            type="date"
+                            className="w-full text-sm font-bold text-slate-700 px-5 py-4 rounded-[1.25rem] bg-slate-50 border border-slate-100 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 focus:bg-white transition-all"
+                            value={makeupDate}
+                            onChange={(e) => setMakeupDate(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                )}
+
+                <div className="mb-6">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">
+                        Reason & Additional Notes
                     </label>
-                    <input 
-                        type="date"
-                        className="w-full text-xs font-bold text-slate-700 p-2 rounded-lg bg-slate-50 border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
-                        value={makeupDate}
-                        onChange={(e) => setMakeupDate(e.target.value)}
-                        autoFocus
+                    <textarea 
+                        className="w-full text-sm font-bold text-slate-700 p-5 rounded-[1.25rem] bg-slate-50 border border-slate-100 outline-none focus:ring-4 focus:ring-amber-100 focus:border-amber-400 focus:bg-white resize-none transition-all placeholder:text-slate-300"
+                        placeholder={selectedStatus === 'Make-up' ? "Briefly explain the make-up context..." : "Document the reason for absence..."}
+                        rows={3}
+                        value={noteValue}
+                        onChange={(e) => setNoteValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                saveLeaveNote();
+                            } else if (e.key === 'Escape') {
+                                cancelLeaveNote();
+                            }
+                        }}
                     />
                 </div>
-            )}
-            <textarea 
-                className="w-full text-sm font-medium text-slate-700 p-3 rounded-lg bg-slate-50 border border-slate-200 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 resize-none mb-3 placeholder:text-slate-400"
-                placeholder={selectedStatus === 'Make-up' ? "Add a note (optional)..." : "Enter reason for leave..."}
-                rows={selectedStatus === 'Make-up' ? 2 : 3}
-                value={noteValue}
-                onChange={(e) => setNoteValue(e.target.value)}
-                onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveLeaveNote();
-                } else if (e.key === 'Escape') {
-                    cancelLeaveNote();
-                }
-                }}
-            />
-            <div className="flex justify-end gap-2">
-                <button 
-                onClick={cancelLeaveNote} 
-                className="px-3 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1.5"
-                >
-                <X size={14} /> Cancel
-                </button>
-                <button 
-                onClick={saveLeaveNote} 
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center gap-1.5"
-                >
-                <Check size={14} strokeWidth={2.5} /> Save Note
-                </button>
-            </div>
+
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={cancelLeaveNote} 
+                        className="flex-1 px-6 py-4 rounded-[1.25rem] text-sm font-black text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={saveLeaveNote} 
+                        className="flex-[1.5] px-6 py-4 rounded-[1.25rem] bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95"
+                    >
+                        Save Record
+                    </button>
+                </div>
             </div>
         </>
       )}

@@ -115,9 +115,9 @@ export default function EditStudentPage() {
           await updateStudent(studentId, studentData);
 
           // If status changed to Inactive or Hold, deactivate all enrollments
-          const newStatus = formData.get("status") as string;
+          const newStatus = formData.get("status") as any;
           if ((newStatus === "Inactive" || newStatus === "Hold") && student.status === "Active") {
-              await deactivateStudentEnrollments(studentId);
+              await deactivateStudentEnrollments(studentId, newStatus);
           }
 
           router.push('/admin/students?action=updated');
