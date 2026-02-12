@@ -358,7 +358,6 @@ export default function DashboardPage() {
               </div>
               <div>
                   <h1 className="text-3xl font-black text-slate-900 tracking-tight">Dashboard</h1>
-                  <p className="text-sm font-medium text-slate-500">School growth and activity at a glance</p>
               </div>
           </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Plus, Pencil, Trash2, X, Loader2, Filter, CheckCircle2, CalendarCheck, Building2, ChevronDown, DollarSign } from "lucide-react";
+import { Calendar, Plus, Pencil, X, Loader2, Filter, CheckCircle2, CalendarCheck, Building2, ChevronDown, DollarSign } from "lucide-react";
 import { Term, Branch } from "@/lib/types";
 import { termService } from "@/services/termService";
 import { branchService } from "@/services/branchService";
@@ -283,48 +283,54 @@ export default function TermsPage() {
             </button>
         </div>
 
-            {/* FILTERS */}
-        {/* FILTERS */}
-        <div className="bg-white/60 backdrop-blur-md p-5 rounded-[2rem] border border-white/50 shadow-sm transition-all duration-300">
-            <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* FILTERS */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/40 backdrop-blur-xl p-2.5 rounded-[2.25rem] border border-white/60 shadow-xl shadow-slate-200/40">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                     {/* Branch Filter */}
-                    <div className="relative group z-20">
-                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center pointer-events-none transition-transform group-hover:scale-110">
-                            <Building2 size={14} />
-                        </div>
+                    <div className="relative group w-full sm:w-64">
                         <select
                             value={filterBranch}
                             onChange={(e) => setFilterBranch(e.target.value)}
-                            className="w-full pl-12 pr-10 py-3 bg-white/70 border border-slate-200/80 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all appearance-none cursor-pointer hover:bg-white shadow-sm"
+                            className="w-full !pl-14 pr-10 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:border-indigo-200 shadow-sm shadow-slate-100"
                         >
                             <option value="">All Branches</option>
                             {branches.map(b => (
                                 <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
                             ))}
                         </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center pointer-events-none group-focus-within:bg-indigo-600 group-focus-within:text-white transition-all duration-300 shadow-sm">
+                             <Building2 size={14} />
+                        </div>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
                     </div>
 
                     {/* Status Filter */}
-                    <div className="relative group z-20">
-                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center pointer-events-none transition-transform group-hover:scale-110">
-                            <Filter size={14} />
-                        </div>
+                    <div className="relative group w-full sm:w-64">
                         <select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value as any)}
-                            className="w-full pl-12 pr-10 py-3 bg-white/70 border border-slate-200/80 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100/50 transition-all appearance-none cursor-pointer hover:bg-white shadow-sm"
+                            className="w-full !pl-14 pr-10 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer hover:border-indigo-200 shadow-sm shadow-slate-100"
                         >
-                            <option value="all">All Term Statuses</option>
+                            <option value="all">All Term</option>
                             <option value="active">Active Now</option>
                             <option value="inactive">Previous & Upcoming</option>
                         </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center pointer-events-none group-focus-within:bg-amber-600 group-focus-within:text-white transition-all duration-300 shadow-sm">
+                             <Filter size={14} />
+                        </div>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-focus-within:text-indigo-500 transition-colors" size={14} />
                     </div>
                 </div>
+
+                <div className="hidden sm:block h-8 w-px bg-slate-100 mx-2"></div>
+
+                <div className="flex items-center gap-2 px-6 py-2 bg-indigo-50/50 rounded-2xl border border-indigo-100 w-full sm:w-auto justify-center sm:justify-start">
+                     <CalendarCheck size={16} className="text-indigo-600" />
+                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none">
+                         Filtering {filteredTerms.length} Results
+                     </span>
+                </div>
             </div>
-        </div>
 
             {/* FORM MODAL */}
             {showForm && (
@@ -535,11 +541,11 @@ export default function TermsPage() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredTerms.map(term => (
-                                    <div 
-                                        key={term.term_id} 
-                                        className="group relative bg-white border border-slate-200/60 rounded-[1.25rem] p-7 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] hover:scale-[1.02] hover:border-indigo-200 transition-all duration-500 overflow-hidden cursor-pointer active:scale-95"
-                                        onClick={() => router.push(`/admin/attendance/terms/${term.term_id}/classes`)}
-                                    >
+                            <div 
+                                key={term.term_id} 
+                                className="group relative bg-white border border-slate-200/60 rounded-[1.25rem] p-7 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] hover:scale-[1.02] hover:border-indigo-200 transition-all duration-500 overflow-hidden cursor-pointer active:scale-95"
+                                onClick={() => router.push(`/admin/attendance/terms/${term.term_id}/classes`)}
+                            >
                                 {/* Premium Background Accent */}
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-bl-[4rem] group-hover:from-indigo-500/10 group-hover:to-purple-500/10 transition-colors" />
 
@@ -554,7 +560,7 @@ export default function TermsPage() {
                                         {isTermActive(term) ? 'Active Term' : 'Offline'}
                                     </div>
 
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -563,16 +569,6 @@ export default function TermsPage() {
                                             className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-indigo-100 transition-all"
                                         >
                                             <Pencil size={15} />
-                                        </button>
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDelete(term.term_id);
-                                            }}
-                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-md border border-transparent hover:border-rose-100 transition-all"
-                                        >
-                                            <Trash2 size={15} />
                                         </button>
                                     </div>
                                 </div>

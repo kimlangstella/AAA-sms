@@ -24,8 +24,10 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToSchoolDetails } from "@/lib/services/schoolService";
 import { School as SchoolType } from "@/lib/types";
+import { useAuth } from '@/lib/useAuth';
 
 export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?: boolean; isOpen?: boolean; onClose?: () => void }) {
+  const { profile } = useAuth();
   const [activeGroup, setActiveGroup] = useState<string | null>("Dashboard");
   const router = useRouter();
   const [school, setSchool] = useState<SchoolType | null>(null);
@@ -156,8 +158,8 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                 setActiveGroup={setActiveGroup}
                 isCollapsed={isCollapsed}
                 items={[
-                    { label: "Branch Setup", href: "/admin/setup?tab=branches" },
-                    { label: "Program Setup", href: "/admin/setup?tab=programs" },
+                    { label: "Branch", href: "/admin/setup?tab=branches" },
+                    { label: "Program", href: "/admin/setup?tab=programs" },
                 ]}
             />
 
@@ -171,6 +173,7 @@ export function Sidebar({ isCollapsed, isOpen = false, onClose }: { isCollapsed?
                     { label: "Dashboard", href: "/admin/insurance" },
                 ]}
             />
+
         </nav>
         
         {/* User Profile / Logout */}

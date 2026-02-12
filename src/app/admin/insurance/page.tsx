@@ -12,7 +12,6 @@ import {
   Filter,
   Calendar,
   Eye,
-  Trash2,
   Edit2,
   MoreVertical
 } from "lucide-react";
@@ -20,8 +19,10 @@ import {
 import { AddInsuranceModal } from "@/components/modals/AddInsuranceModal";
 import { subscribeToStudents } from "@/lib/services/schoolService";
 import { Student } from "@/lib/types";
+import { useAuth } from "@/lib/useAuth";
 
 export default function InsurancePage() {
+  const { profile } = useAuth();
   const [filter, setFilter] = useState("All");
   const [showModal, setShowModal] = useState(false);
   const [policies, setPolicies] = useState<any[]>([]);
@@ -304,13 +305,6 @@ export default function InsurancePage() {
                                         onClick={() => openRenewModal(policy)}
                                       >
                                           <Edit2 size={15} /> 
-                                      </button>
-                                      <button 
-                                        className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-white transition-all border border-transparent hover:border-rose-100 shadow-sm hover:shadow-md" 
-                                        title="Delete"
-                                        onClick={() => handleDeleteInsurance(policy.id, policy.studentName)}
-                                      >
-                                          <Trash2 size={15} /> 
                                       </button>
                                   </div>
                               </td>

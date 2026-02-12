@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Search, Download, Edit2, Check, AlertTriangle, Trash2 } from "lucide-react";
+import { X, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Search, Download, Edit2, Check, AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Student, Branch, Gender, StudentStatus, Program, Class, Term } from "@/lib/types";
 import { branchService } from "@/services/branchService";
@@ -49,6 +49,8 @@ export default function ImportStudentModal({ isOpen, onClose, onSuccess }: Impor
     const [terms, setTerms] = useState<Term[]>([]);
     const [parsedData, setParsedData] = useState<ParsedStudent[]>([]);
     const [isDragging, setIsDragging] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
     const [results, setResults] = useState({ success: 0, failed: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +73,8 @@ export default function ImportStudentModal({ isOpen, onClose, onSuccess }: Impor
             // Reset state when closing
             setStep('upload');
             setParsedData([]);
+            setSelectedFile(null);
+            setUploadProgress(0);
             setResults({ success: 0, failed: 0 });
             setEditingCell(null);
         }
@@ -87,18 +91,31 @@ export default function ImportStudentModal({ isOpen, onClose, onSuccess }: Impor
         }
 
         if (!file) return;
+        
+        setSelectedFile(file);
+        setUploadProgress(0);
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const bstr = event.target?.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            const data = XLSX.utils.sheet_to_json(ws);
-            
-            processImportData(data);
-        };
-        reader.readAsBinaryString(file);
+        // Simulate upload progress
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 10;
+            setUploadProgress(progress);
+            if (progress >= 100) {
+                clearInterval(interval);
+                
+                // Process the data after "upload" finishes
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const bstr = event.target?.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const data = XLSX.utils.sheet_to_json(ws);
+                    processImportData(data);
+                };
+                reader.readAsBinaryString(file!);
+            }
+        }, 150);
     };
 
     const validateStudent = (student: Partial<ParsedStudent>) => {
@@ -339,306 +356,401 @@ export default function ImportStudentModal({ isOpen, onClose, onSuccess }: Impor
 
     return (
         <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md p-2 sm:p-6 lg:p-10"
             onClick={onClose}
         >
             <div 
                 onClick={(e) => e.stopPropagation()}
-                className={`bg-white rounded-[2.5rem] shadow-2xl overflow-hidden transition-all duration-500 ${step === 'preview' ? 'w-[98%] max-w-[90rem]' : 'w-full max-w-2xl'}`}
+                className={`bg-white/95 backdrop-blur-2xl rounded-[3.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.1)] overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${step === 'preview' ? 'w-[98%] max-w-[90rem]' : 'w-full max-w-xl'} border border-white flex flex-col h-[90vh]`}
             >
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                {/* Custom Animations via CSS in JS */}
+                <style jsx>{`
+                    @keyframes custom-pulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.05); opacity: 0.8; }
+                    }
+                    @keyframes float {
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-8px); }
+                    }
+                    .animate-float { animation: float 3s ease-in-out infinite; }
+                    .animate-custom-pulse { animation: custom-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+                `}</style>
+
+                {/* Header - Slimmer */}
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-white to-indigo-50/30 shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-                            <Upload size={24} />
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-200 animate-custom-pulse">
+                            <Upload size={20} className="sm:w-6 sm:h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-slate-800">Import Students</h2>
-                            <p className="text-sm text-slate-500 font-bold">Standardize your data via Excel/CSV</p>
+                            <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight leading-none">Import Students</h2>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Excel/CSV Integration</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400">
-                        <X size={24} />
+                    <button onClick={onClose} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-rose-500">
+                        <X size={20} />
                     </button>
                 </div>
 
-                <div className="p-6">
+                {/* Content Area - Scrollable */}
+                <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden flex-1 scrollbar-thin scrollbar-thumb-slate-200">
                     {step === 'upload' && (
-                        <div className="space-y-6">
-                            <div 
-                                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                onDragLeave={() => setIsDragging(false)}
-                                onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e); }}
-                                onClick={() => fileInputRef.current?.click()}
-                                className={`relative border-4 border-dashed rounded-[2rem] p-16 text-center transition-all cursor-pointer ${
-                                    isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50/50'
-                                }`}
-                            >
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    className="hidden" 
-                                    accept=".xlsx,.xls,.csv"
-                                    onChange={handleFileUpload} 
-                                />
-                                <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 mx-auto mb-6">
-                                    <FileText size={40} />
-                                </div>
-                                <h3 className="text-2xl font-black text-slate-800 mb-2">Click or Drag to Upload</h3>
-                                <p className="text-slate-500 font-bold max-w-sm mx-auto">
-                                    Support Excel (.xlsx, .xls) and CSV files. Make sure your columns match our system.
-                                </p>
-                            </div>
+                        <div className="space-y-8 animate-in fade-in duration-500">
+                            {!selectedFile ? (
+                                        <div 
+                                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                            onDragLeave={() => setIsDragging(false)}
+                                            onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e); }}
+                                            className={`relative border-2 border-dashed rounded-[2.5rem] p-12 text-center transition-all duration-500 cursor-pointer group overflow-hidden ${
+                                                isDragging ? 'border-indigo-500 bg-indigo-50/50 scale-[0.98]' : 'border-slate-100 hover:border-indigo-300 hover:bg-slate-50/50'
+                                            }`}
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <input 
+                                                type="file" 
+                                                ref={fileInputRef} 
+                                                className="hidden" 
+                                                accept=".xlsx,.xls,.csv"
+                                                onChange={handleFileUpload} 
+                                            />
+                                            
+                                            {/* Image2 Styled Icon Area */}
+                                            <div className="relative flex flex-col items-center">
+                                                <div className="relative mb-8 group-hover:scale-110 transition-transform duration-500">
+                                                    {/* Outer Shadow Circle */}
+                                                    <div className="absolute inset-x-0 -bottom-4 h-8 bg-black/5 blur-2xl rounded-full scale-x-150" />
+                                                    
+                                                    {/* Document Icon (Stacked Style) */}
+                                                    <div className="relative w-28 h-28 bg-indigo-950 text-white rounded-[2rem] flex items-center justify-center shadow-2xl overflow-hidden">
+                                                        <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-900/40 rounded-bl-[1.5rem]" />
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-10 h-1.5 bg-indigo-400/50 rounded-full mb-1.5" />
+                                                            <div className="w-14 h-1.5 bg-indigo-400/50 rounded-full mb-1.5" />
+                                                            <div className="text-[12px] font-black uppercase tracking-widest mt-2">.EXCEL</div>
+                                                        </div>
+                                                        
+                                                        {/* Downward Arrow Overlay (Image2 style) */}
+                                                        <div className="absolute -bottom-2 -right-2 w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center border-4 border-white shadow-xl">
+                                                            <Download size={24} strokeWidth={3} className="text-white" />
+                                                        </div>
+                                                    </div>
+                                                </div>
 
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-indigo-600 shadow-sm">
-                                        <Download size={18} />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-600">Need a starting point?</p>
-                                </div>
-                                <button 
-                                    onClick={downloadTemplate}
-                                    className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm"
-                                >
-                                    Download Template
-                                </button>
-                            </div>
+                                                <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Drag & Drop</h3>
+                                                <div className="flex items-center gap-1.5 mt-2">
+                                                    <span className="text-slate-400 font-bold text-xs">or</span>
+                                                    <span className="text-indigo-600 font-black text-xs hover:underline">choose a file</span>
+                                                </div>
+                                                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mt-12">Maximum file size 50MB</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-10 animate-in zoom-in-95 duration-500">
+                                            {/* Ready to Process / Uploading Title */}
+                                            <div className="text-center">
+                                                <h3 className="text-4xl font-black text-slate-900 tracking-tighter animate-pulse uppercase">
+                                                    {uploadProgress < 100 ? 'Uploading...' : 'File Ready'}
+                                                </h3>
+                                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">Analyzing structure</p>
+                                            </div>
+
+                                            {/* Styled File Card (Image2 style, compact at bottom) */}
+                                            <div className="bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] p-6 flex items-center justify-between shadow-2xl shadow-indigo-200/20 border border-indigo-400/10">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-inner">
+                                                        <FileText size={24} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-base font-black text-white truncate max-w-[200px]">{selectedFile.name}</h4>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <button 
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className="w-10 h-10 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shadow-sm"
+                                                    >
+                                                        <RotateCcw size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => { setSelectedFile(null); setUploadProgress(0); }}
+                                                        className="w-10 h-10 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-rose-400 transition-all shadow-sm"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Linear Progress Bar */}
+                                            {uploadProgress < 100 && (
+                                                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden relative">
+                                                    <div 
+                                                        className="absolute inset-y-0 left-0 bg-indigo-600 transition-all duration-300 ease-out rounded-full"
+                                                        style={{ width: `${uploadProgress}%` }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                         </div>
                     )}
 
                     {step === 'preview' && (
-                        <div className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-black text-slate-800">
-                                    Preview & Edit Data <span className="text-indigo-600 ml-2">({parsedData.length} Students)</span>
-                                </h3>
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="flex items-center justify-between px-2">
+                                <div className="max-w-[60%]">
+                                    <h3 className="text-xl font-black text-slate-800 tracking-tight leading-tight">
+                                        Data Preview <span className="text-indigo-600 ml-1">({parsedData.length} records)</span>
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest leading-none">Verify and edit information</p>
+                                </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl text-xs font-black shadow-sm border border-emerald-100">
-                                        <CheckCircle2 size={16} />
-                                        <span>{parsedData.filter(d => d.isValid).length} Valid</span>
+                                    <div className="flex flex-col items-center px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 shadow-sm">
+                                        <span className="text-sm font-black leading-none">{parsedData.filter(d => d.isValid).length}</span>
+                                        <span className="text-[8px] font-bold uppercase tracking-widest mt-0.5">Valid</span>
                                     </div>
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black shadow-sm border border-rose-100">
-                                        <AlertCircle size={16} />
-                                        <span>{parsedData.filter(d => !d.isValid).length} Invalid</span>
+                                    <div className="flex flex-col items-center px-4 py-1.5 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 shadow-sm">
+                                        <span className="text-sm font-black leading-none">{parsedData.filter(d => !d.isValid).length}</span>
+                                        <span className="text-[8px] font-bold uppercase tracking-widest mt-0.5">Errors</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
-                                <AlertTriangle className="text-amber-600" size={20} />
-                                <p className="text-xs font-bold text-amber-700">Click on any cell to edit. Ensure Branch and Program match for correct enrollment.</p>
+                            <div className="p-4 bg-gradient-to-r from-amber-50 to-amber-50/30 rounded-2xl border border-amber-100/50 flex items-center gap-3 shadow-sm">
+                                <Edit2 size={16} className="text-amber-600 shrink-0" />
+                                <p className="text-[11px] font-bold text-amber-700/80 leading-snug">
+                                    Click any cell highlighted in pink to fix validation errors. 
+                                    Branch and Program names must match your setup.
+                                </p>
                             </div>
 
-                            <div className="overflow-x-auto rounded-[2rem] border border-slate-100 shadow-sm max-h-[500px]">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
-                                        <tr>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Name</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Gender</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">DOB</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Branch</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Program</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Class</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Phone</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
-                                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {parsedData.map((student, idx) => (
-                                            <tr key={idx} className={`${student.isValid ? 'hover:bg-slate-50/50' : 'bg-rose-50/30'} transition-all group`}>
-                                                {/* Name Cell */}
-                                                <td className="p-4 min-w-[180px]">
-                                                    <div className="flex items-center gap-2">
-                                                        {student.isValid ? (
-                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                            <div className="overflow-hidden rounded-[2rem] border border-slate-100 shadow-[0_12px_40px_rgba(0,0,0,0.05)] bg-white">
+                                <div className="overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-slate-200">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
+                                            <tr>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Name</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Gender</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">DOB</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Branch</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Program</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Class</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Phone</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                                                <th className="p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {parsedData.map((student, idx) => (
+                                                <tr key={idx} className={`${student.isValid ? 'hover:bg-slate-50/50' : 'bg-rose-50/30'} transition-all group`}>
+                                                    <td className="p-3 min-w-[160px]">
+                                                        <div className="flex items-center gap-2">
+                                                            {student.isValid ? (
+                                                                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                            ) : (
+                                                                <AlertCircle className="text-rose-500 shrink-0" size={12} />
+                                                            )}
+                                                            {editingCell?.index === idx && editingCell?.field === 'student_name' ? (
+                                                                <input 
+                                                                    autoFocus
+                                                                    className="w-full text-xs font-bold text-slate-800 bg-white border border-indigo-300 rounded px-2 py-1 outline-none"
+                                                                    value={student.student_name}
+                                                                    onChange={(e) => handleEditCell(idx, 'student_name', e.target.value)}
+                                                                    onBlur={() => setEditingCell(null)}
+                                                                />
+                                                            ) : (
+                                                                <div onClick={() => setEditingCell({ index: idx, field: 'student_name' })} className="flex items-center justify-between w-full cursor-pointer hover:bg-slate-100 rounded px-2 py-0.5">
+                                                                    <span className="text-xs font-bold text-slate-700">{student.student_name}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="p-3">
+                                                        <div onClick={() => setEditingCell({ index: idx, field: 'gender' })} className="cursor-pointer hover:bg-slate-100 rounded px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                                            {editingCell?.index === idx && editingCell?.field === 'gender' ? (
+                                                                <select className="bg-white border border-indigo-300 rounded outline-none text-xs" value={student.gender} onChange={(e) => handleEditCell(idx, 'gender', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
+                                                                    <option value="Male">Male</option>
+                                                                    <option value="Female">Female</option>
+                                                                </select>
+                                                            ) : student.gender}
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="p-3">
+                                                        {editingCell?.index === idx && editingCell?.field === 'dob' ? (
+                                                            <input type="date" className="text-xs bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.dob} onChange={(e) => handleEditCell(idx, 'dob', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus />
                                                         ) : (
-                                                            <AlertCircle className="text-rose-500 shrink-0" size={14} />
-                                                        )}
-                                                        {editingCell?.index === idx && editingCell?.field === 'student_name' ? (
-                                                            <input 
-                                                                autoFocus
-                                                                className="w-full text-sm font-bold text-slate-800 bg-white border border-indigo-300 rounded px-2 py-1 outline-none"
-                                                                value={student.student_name}
-                                                                onChange={(e) => handleEditCell(idx, 'student_name', e.target.value)}
-                                                                onBlur={() => setEditingCell(null)}
-                                                            />
-                                                        ) : (
-                                                            <div onClick={() => setEditingCell({ index: idx, field: 'student_name' })} className="flex items-center justify-between w-full cursor-pointer hover:bg-slate-100 rounded px-2 py-1">
-                                                                <span className="text-sm font-bold text-slate-700">{student.student_name}</span>
+                                                            <div onClick={() => setEditingCell({ index: idx, field: 'dob' })} className="cursor-pointer hover:bg-slate-100 rounded px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                                                {student.dob || 'YYYY-MM-DD'}
                                                             </div>
                                                         )}
-                                                    </div>
-                                                </td>
+                                                    </td>
 
-                                                {/* Gender Cell */}
-                                                <td className="p-4">
-                                                     <div onClick={() => setEditingCell({ index: idx, field: 'gender' })} className="cursor-pointer hover:bg-slate-100 rounded px-2 py-1 text-sm font-semibold text-slate-600">
-                                                        {editingCell?.index === idx && editingCell?.field === 'gender' ? (
-                                                            <select className="bg-white border border-indigo-300 rounded outline-none" value={student.gender} onChange={(e) => handleEditCell(idx, 'gender', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
-                                                                <option value="Male">Male</option>
-                                                                <option value="Female">Female</option>
+                                                    <td className="p-3">
+                                                        {editingCell?.index === idx && editingCell?.field === 'branch_name' ? (
+                                                            <select className="text-xs bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.branch_name} onChange={(e) => handleEditCell(idx, 'branch_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
+                                                                <option value="">Select Branch</option>
+                                                                {branches.map(b => <option key={b.branch_id} value={b.branch_name}>{b.branch_name}</option>)}
                                                             </select>
-                                                        ) : student.gender}
-                                                    </div>
-                                                </td>
+                                                        ) : (
+                                                            <div onClick={() => setEditingCell({ index: idx, field: 'branch_name' })} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap cursor-pointer ${branches.some(b => b.branch_name.toLowerCase() === student.branch_name.toLowerCase()) ? 'bg-slate-100 text-slate-700' : 'bg-rose-100 text-rose-700 border border-rose-200'}`}>
+                                                                {student.branch_name || 'Select Branch'}
+                                                            </div>
+                                                        )}
+                                                    </td>
 
-                                                {/* DOB Cell */}
-                                                <td className="p-4">
-                                                    {editingCell?.index === idx && editingCell?.field === 'dob' ? (
-                                                        <input type="date" className="text-sm bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.dob} onChange={(e) => handleEditCell(idx, 'dob', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus />
-                                                    ) : (
-                                                        <div onClick={() => setEditingCell({ index: idx, field: 'dob' })} className="cursor-pointer hover:bg-slate-100 rounded px-2 py-1 text-sm font-semibold text-slate-600">
-                                                            {student.dob || 'YYYY-MM-DD'}
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                    <td className="p-3">
+                                                        {editingCell?.index === idx && editingCell?.field === 'program_name' ? (
+                                                            <select className="text-xs bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.program_name} onChange={(e) => handleEditCell(idx, 'program_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
+                                                                <option value="">Select Program</option>
+                                                                {programs.filter(p => !student.branch_id || p.branchId === student.branch_id).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                                            </select>
+                                                        ) : (
+                                                            <div onClick={() => setEditingCell({ index: idx, field: 'program_name' })} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap cursor-pointer ${programs.some(p => p.name.toLowerCase() === (student.program_name || '').toLowerCase() && (!student.branch_id || p.branchId === student.branch_id)) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400'}`}>
+                                                                {student.program_name || 'Optional'}
+                                                            </div>
+                                                        )}
+                                                    </td>
 
-                                                {/* Branch Cell */}
-                                                <td className="p-4">
-                                                    {editingCell?.index === idx && editingCell?.field === 'branch_name' ? (
-                                                        <select className="text-sm bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.branch_name} onChange={(e) => handleEditCell(idx, 'branch_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
-                                                            <option value="">Select Branch</option>
-                                                            {branches.map(b => <option key={b.branch_id} value={b.branch_name}>{b.branch_name}</option>)}
-                                                        </select>
-                                                    ) : (
-                                                        <div onClick={() => setEditingCell({ index: idx, field: 'branch_name' })} className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer ${branches.some(b => b.branch_name.toLowerCase() === student.branch_name.toLowerCase()) ? 'bg-slate-100 text-slate-700' : 'bg-rose-100 text-rose-700 border border-rose-200'}`}>
-                                                            {student.branch_name || 'Select Branch'}
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                    <td className="p-3">
+                                                        {editingCell?.index === idx && editingCell?.field === 'class_name' ? (
+                                                            <select className="text-xs bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.class_name} onChange={(e) => handleEditCell(idx, 'class_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
+                                                                <option value="">Select Class</option>
+                                                                {classes.filter(c => (!student.branch_id || c.branchId === student.branch_id) && (!student.program_id || c.programId === student.program_id)).map(c => <option key={c.class_id} value={c.className}>{c.className}</option>)}
+                                                            </select>
+                                                        ) : (
+                                                            <div onClick={() => setEditingCell({ index: idx, field: 'class_name' })} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap cursor-pointer ${classes.some(c => c.className.toLowerCase() === (student.class_name || '').toLowerCase() && (!student.branch_id || c.branchId === student.branch_id) && (!student.program_id || c.programId === student.program_id)) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400'}`}>
+                                                                {student.class_name || 'Optional'}
+                                                            </div>
+                                                        )}
+                                                    </td>
 
-                                                {/* Program Cell */}
-                                                <td className="p-4">
-                                                    {editingCell?.index === idx && editingCell?.field === 'program_name' ? (
-                                                        <select className="text-sm bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.program_name} onChange={(e) => handleEditCell(idx, 'program_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
-                                                            <option value="">Select Program</option>
-                                                            {programs
-                                                                .filter(p => !student.branch_id || p.branchId === student.branch_id)
-                                                                .map(p => <option key={p.id} value={p.name}>{p.name}</option>)
-                                                            }
-                                                        </select>
-                                                    ) : (
-                                                        <div onClick={() => setEditingCell({ index: idx, field: 'program_name' })} className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer ${programs.some(p => p.name.toLowerCase() === (student.program_name || '').toLowerCase() && (!student.branch_id || p.branchId === student.branch_id)) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400'}`}>
-                                                            {student.program_name || 'Optional'}
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                    <td className="p-3 text-xs font-semibold text-slate-600">{student.phone || '-'}</td>
 
-                                                {/* Class Cell */}
-                                                <td className="p-4">
-                                                    {editingCell?.index === idx && editingCell?.field === 'class_name' ? (
-                                                        <select className="text-sm bg-white border border-indigo-300 rounded outline-none px-2 py-1" value={student.class_name} onChange={(e) => handleEditCell(idx, 'class_name', e.target.value)} onBlur={() => setEditingCell(null)} autoFocus>
-                                                            <option value="">Select Class</option>
-                                                            {classes
-                                                                .filter(c => 
-                                                                    (!student.branch_id || c.branchId === student.branch_id) && 
-                                                                    (!student.program_id || c.programId === student.program_id)
-                                                                )
-                                                                .map(c => <option key={c.class_id} value={c.className}>{c.className}</option>)
-                                                            }
-                                                        </select>
-                                                    ) : (
-                                                        <div onClick={() => setEditingCell({ index: idx, field: 'class_name' })} className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer ${classes.some(c => c.className.toLowerCase() === (student.class_name || '').toLowerCase() && (!student.branch_id || c.branchId === student.branch_id) && (!student.program_id || c.programId === student.program_id)) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400'}`}>
-                                                            {student.class_name || 'Optional'}
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                    <td className="p-3">
+                                                        {!student.isValid ? (
+                                                            <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 whitespace-nowrap">{student.errors[0]}</span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-black text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full border border-emerald-100 uppercase tracking-tighter">Ready</span>
+                                                        )}
+                                                    </td>
 
-                                                <td className="p-4 text-sm font-semibold text-slate-600">{student.phone || '-'}</td>
-
-                                                {/* Status Cell */}
-                                                <td className="p-4">
-                                                    {!student.isValid ? (
-                                                        <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded border border-rose-100 whitespace-nowrap">{student.errors[0]}</span>
-                                                    ) : (
-                                                        <span className="text-[10px] font-black text-emerald-600 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100 uppercase tracking-tighter">Ready</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Action Cell */}
-                                                <td className="p-4 text-center">
-                                                    <button 
-                                                        onClick={() => handleDeleteRow(idx)}
-                                                        className="p-2 hover:bg-rose-50 text-rose-400 hover:text-rose-600 rounded-xl transition-all"
-                                                        title="Delete row"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-4">
-                                <button onClick={() => setStep('upload')} className="px-6 py-3 text-slate-400 font-bold text-sm hover:text-slate-600 flex items-center gap-2">
-                                    <X size={16} /> Back to Upload
-                                </button>
-                                <button onClick={() => setStep('confirm')} disabled={parsedData.some(d => !d.isValid)} className="px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3">
-                                    <span>Process Import</span> <CheckCircle2 size={20} />
-                                </button>
+                                                    <td className="p-3 text-center">
+                                                        <Trash2 size={14} className="text-slate-300 hover:text-rose-500 cursor-pointer mx-auto transition-colors" onClick={() => handleDeleteRow(idx)} />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {step === 'confirm' && (
-                        <div className="py-8 space-y-8 animate-in fade-in zoom-in-95 duration-300 text-center">
-                            <div className="w-20 h-20 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+                        <div className="py-6 space-y-8 animate-in fade-in zoom-in-95 duration-500 text-center flex flex-col items-center">
+                            <div className="w-20 h-20 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm animate-custom-pulse">
                                 <AlertTriangle size={40} />
                             </div>
-                            <h3 className="text-3xl font-black text-slate-800">Review & Confirm</h3>
-                            <p className="text-slate-500 font-bold max-w-sm mx-auto">
-                                You are about to import <span className="text-indigo-600">{parsedData.length} students</span>. Automatically creating enrollments for Program & Class study.
-                            </p>
-
-                            <div className="bg-slate-50 rounded-[2rem] border border-slate-100 p-8 space-y-4 max-w-md mx-auto">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-bold text-slate-500">Students to Import</span>
-                                    <span className="text-xl font-black text-slate-800">{parsedData.length}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-bold text-slate-500">Scheduled Enrollments</span>
-                                    <span className="text-xl font-black text-indigo-600">{parsedData.filter(d => d.program_name && d.class_name).length}</span>
-                                </div>
+                            <div>
+                                <h3 className="text-3xl font-black text-slate-800 tracking-tight leading-none">Ready to fly?</h3>
+                                <p className="text-slate-400 font-bold mt-2 uppercase tracking-widest text-[10px]">Final check before commitment</p>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                                <button onClick={() => setStep('preview')} className="py-4 bg-white border border-slate-200 text-slate-600 rounded-[1.5rem] font-black hover:border-slate-300">Back</button>
-                                <button onClick={handleImport} className="py-4 bg-slate-800 text-white rounded-[1.5rem] font-black hover:bg-slate-900 shadow-xl flex items-center justify-center gap-2">
-                                    <Check size={20} /> Confirm
-                                </button>
+                            
+                            <div className="grid grid-cols-2 gap-4 w-full max-w-md p-2">
+                                <div className="bg-white rounded-[1.5rem] border-2 border-slate-50 p-6 shadow-lg shadow-slate-100/50 flex flex-col items-center">
+                                    <span className="text-3xl font-black text-slate-800">{parsedData.length}</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">New Students</span>
+                                </div>
+                                <div className="bg-indigo-600 rounded-[1.5rem] p-6 shadow-lg shadow-indigo-100 flex flex-col items-center transform scale-105">
+                                    <span className="text-3xl font-black text-white">{parsedData.filter(d => d.program_name && d.class_name).length}</span>
+                                    <span className="text-[9px] font-black text-indigo-200 uppercase tracking-widest mt-1">Enrollments</span>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {step === 'importing' && (
-                        <div className="py-12 text-center space-y-6">
-                            <div className="relative w-32 h-32 mx-auto">
+                        <div className="py-12 text-center space-y-8 flex flex-col items-center">
+                            <div className="relative w-36 h-36 mx-auto">
                                 <svg className="w-full h-full transform -rotate-90">
-                                    <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                                    <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={377} strokeDashoffset={377 * (1 - importProgress.current / importProgress.total)} className="text-indigo-600 transition-all duration-300" />
+                                    <circle cx="72" cy="72" r="60" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-slate-50" />
+                                    <circle cx="72" cy="72" r="60" stroke="currentColor" strokeWidth="10" fill="transparent" strokeDasharray={377} strokeDashoffset={377 * (1 - importProgress.current / importProgress.total)} strokeLinecap="round" className="text-indigo-600 transition-all duration-700 ease-out" />
                                 </svg>
-                                <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl font-black text-slate-800">{Math.round((importProgress.current / importProgress.total) * 100)}%</span></div>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span className="text-3xl font-black text-slate-800 tracking-tighter">{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Syncing</span>
+                                </div>
                             </div>
-                            <h3 className="text-xl font-black text-slate-800">Processing Import...</h3>
-                            <p className="text-slate-500 font-bold mt-1">Importing {importProgress.current} of {importProgress.total} students</p>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2">
+                                    Committing to Cloud <Loader2 size={20} className="animate-spin text-indigo-600" />
+                                </h3>
+                                <p className="text-slate-400 font-bold mt-1 uppercase tracking-widest text-[10px]">Writing student {importProgress.current} of {importProgress.total}</p>
+                            </div>
                         </div>
                     )}
 
                     {step === 'summary' && (
-                        <div className="py-12 text-center space-y-8">
-                            <div className="w-24 h-24 rounded-[2rem] bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto"><CheckCircle2 size={48} /></div>
-                            <h3 className="text-3xl font-black text-slate-800">Import Complete!</h3>
-                            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-                                <div className="bg-emerald-50 rounded-3xl p-6 border border-emerald-100"><h4 className="text-2xl font-black text-emerald-700">{results.success}</h4><p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Successful</p></div>
-                                <div className="bg-rose-50 rounded-3xl p-6 border border-rose-100"><h4 className="text-2xl font-black text-rose-700">{results.failed}</h4><p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Failed</p></div>
+                        <div className="py-8 text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col items-center">
+                            <div className="w-24 h-24 rounded-[2.5rem] bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-emerald-100 shadow-xl animate-custom-pulse">
+                                <CheckCircle2 size={48} />
                             </div>
-                            <button onClick={onClose} className="w-full max-w-xs py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl">Continue</button>
+                            <div>
+                                <h3 className="text-3xl font-black text-slate-800 tracking-tight">Mission Done!</h3>
+                                <p className="text-slate-400 font-bold mt-2 uppercase tracking-widest text-[10px]">Import process finalized</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+                                <div className="bg-white rounded-[1.5rem] p-6 border-2 border-emerald-50 shadow-lg shadow-emerald-100/30">
+                                    <h4 className="text-3xl font-black text-emerald-600 tracking-tighter">{results.success}</h4>
+                                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mt-2">Imported</p>
+                                </div>
+                                <div className="bg-white rounded-[1.5rem] p-6 border-2 border-rose-50 shadow-lg shadow-rose-100/30">
+                                    <h4 className="text-3xl font-black text-rose-600 tracking-tighter">{results.failed}</h4>
+                                    <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mt-2">Rejected</p>
+                                </div>
+                            </div>
                         </div>
                     )}
+                </div>
+
+                {/* Footer - Sticky at bottom */}
+                <div className="p-4 sm:p-6 border-t border-slate-50 bg-slate-50/50 flex items-center justify-end shrink-0">
+                    <div className="flex items-center gap-3">
+                        {step === 'upload' && (
+                            <>
+                                <button onClick={onClose} className="px-8 py-3 text-slate-400 font-bold text-sm hover:text-slate-600 tracking-tight transition-colors">
+                                    Cancel
+                                </button>
+                                {selectedFile && uploadProgress >= 100 && (
+                                    <button 
+                                        onClick={() => setStep('preview')}
+                                        className="px-10 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95"
+                                    >
+                                        Submit
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        {step === 'preview' && (
+                            <button onClick={() => setStep('confirm')} disabled={parsedData.some(d => !d.isValid)} className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm active:scale-95">
+                                <span>Continue</span> <CheckCircle2 size={16} />
+                            </button>
+                        )}
+                        {step === 'confirm' && (
+                            <button onClick={handleImport} className="px-10 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-black shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 group">
+                                <Check size={18} /> Confirm & Import
+                            </button>
+                        )}
+                        {step === 'summary' && (
+                            <button onClick={onClose} className="px-12 py-3 bg-slate-900 text-white rounded-2xl font-black text-base hover:bg-black shadow-xl transition-all active:scale-95">
+                                Finish
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

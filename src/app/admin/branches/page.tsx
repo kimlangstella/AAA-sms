@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { branchService } from "@/services/branchService";
 import { Branch } from "@/lib/types";
-import { Plus, Building2, MapPin, Trash2, Edit } from "lucide-react";
+import { Plus, Building2, MapPin, Edit } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
 export default function BranchesPage() {
@@ -89,10 +89,10 @@ export default function BranchesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {branches.map((branch) => (
             <div key={branch.branch_id} className="glass-card group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <button onClick={() => handleDelete(branch.branch_id)} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div className="absolute top-0 right-0 p-4 flex gap-2">
+                  <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                    <Edit className="h-4 w-4" />
+                  </button>
               </div>
               
               <div className="flex items-center gap-4 mb-4">

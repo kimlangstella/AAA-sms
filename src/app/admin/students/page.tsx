@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
-    UserPlus, Search, Filter, Loader2, Pencil, Trash2, Eye, 
+    UserPlus, Search, Filter, Loader2, Pencil, Eye, 
     ArrowUpDown, ArrowUp, ArrowDown, Settings2, X, ChevronDown,
     Users, Calendar, CreditCard, Shield, Check, MoreVertical, Download
 } from "lucide-react";
 import { Student, Branch, Enrollment, Class } from "@/lib/types";
+import { useAuth } from "@/lib/useAuth";
 import { 
     subscribeToStudents, 
     deleteStudent, 
@@ -45,6 +46,7 @@ const ALL_COLUMNS = [
 ];
 
 export default function StudentsPage() {
+    const { profile } = useAuth();
     const router = useRouter();
 
     // Data State
@@ -85,6 +87,10 @@ export default function StudentsPage() {
 
     // Selection State
     const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 20;
 
     // Fetch Data
     useEffect(() => {
@@ -231,6 +237,19 @@ export default function StudentsPage() {
         return filtered;
     }, [enhancedStudents, searchQuery, filterBranch, filterStatus, filterPaymentStatus, sortConfig]);
 
+    // Paginated Data
+    const paginatedStudents = useMemo(() => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return filteredAndSortedStudents.slice(start, start + PAGE_SIZE);
+    }, [filteredAndSortedStudents, currentPage]);
+
+    const totalPages = Math.ceil(filteredAndSortedStudents.length / PAGE_SIZE);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, filterBranch, filterStatus, filterPaymentStatus]);
+
     // Sorting Handler
     const handleSort = (key: string) => {
         setSortConfig(prev => {
@@ -300,58 +319,120 @@ export default function StudentsPage() {
         setSelectedStudents(newSelected);
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (filteredAndSortedStudents.length === 0) return;
 
-        // 1. Prepare Header Rows (Pretty Template)
-        const headerRows = [
-            ["Authentic Advanced Academy (AAA)"],
-            ["Student List Report"],
-            [`Export Date: ${new Date().toLocaleDateString()}`],
-            [`Total Students: ${filteredAndSortedStudents.length}`],
-            [], // Spacer
-            ['Student ID', 'Name', 'Gender', 'DOB', 'Nationality', 'Branch', 'Program', 'Status', 'Admission Date', 'Payment Status']
-        ];
+        const ExcelJS = (await import('exceljs')).default;
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Students');
 
-        // 2. Prepare Data Rows
-        const dataRows = filteredAndSortedStudents.map(s => [
-            s.student_code,
-            s.student_name,
-            s.gender,
-            s.dob,
-            s.nationality,
-            s.branch_name,
-            s.program,
-            s.status,
-            s.admission_date,
-            s.payment_status
-        ]);
+        // 1. Add School Branding Header
+        const headerRow = worksheet.addRow(['Authentic Advanced Academy (AAA)']);
+        headerRow.font = { name: 'Inter', family: 4, size: 22, bold: true, color: { argb: 'FF4F46E5' } };
+        worksheet.mergeCells('A1:J1');
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 42;
 
-        // 3. Combine and Create Sheet
-        const allRows = [...headerRows, ...dataRows];
-        const worksheet = XLSX.utils.aoa_to_sheet(allRows);
+        const subHeaderRow = worksheet.addRow(['Student Directory & Academic Intelligence Report']);
+        subHeaderRow.font = { name: 'Inter', family: 4, size: 12, bold: true, color: { argb: 'FF64748B' } };
+        worksheet.mergeCells('A2:J2');
+        subHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        subHeaderRow.height = 28;
 
-        // 4. Set Column Widths
-        const wscols = [
-            { wch: 15 }, // Student ID
-            { wch: 30 }, // Name
-            { wch: 10 }, // Gender
-            { wch: 15 }, // DOB
-            { wch: 15 }, // Nationality
-            { wch: 20 }, // Branch
-            { wch: 25 }, // Program
-            { wch: 12 }, // Status
-            { wch: 15 }, // Admission Date
-            { wch: 15 }, // Payment Status
-        ];
-        worksheet['!cols'] = wscols;
-
-        // 5. Create Workbook and Write
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+        const metaRow = worksheet.addRow([`Export Date: ${new Date().toLocaleDateString()} • Total Students: ${filteredAndSortedStudents.length}`]);
+        metaRow.font = { name: 'Inter', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+        worksheet.mergeCells('A3:J3');
+        metaRow.alignment = { horizontal: 'center' };
         
-        // Use XLSX.writeFile for browser download
-        XLSX.writeFile(workbook, `Students_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+        worksheet.addRow([]); // Spacer
+
+        // 2. Main Table Headers (Removed Student ID)
+        const tableHeaders = ['FULL NAME', 'GENDER', 'DOB', 'NATIONALITY', 'BRANCH', 'PROGRAM', 'STATUS', 'ADMISSION', 'PAYMENT'];
+        const header = worksheet.addRow(tableHeaders);
+        
+        header.eachCell((cell) => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF8FAFC' }
+            };
+            cell.font = {
+                name: 'Inter',
+                size: 10,
+                bold: true,
+                color: { argb: 'FF475569' }
+            };
+            cell.border = {
+                bottom: { style: 'medium', color: { argb: 'FFE2E8F0' } }
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        header.height = 32;
+
+        // 3. Add Data Rows
+        filteredAndSortedStudents.forEach((s, index) => {
+            const row = worksheet.addRow([
+                s.student_name,
+                s.gender,
+                s.dob,
+                s.nationality,
+                s.branch_name,
+                s.program,
+                s.status,
+                s.admission_date,
+                s.payment_status
+            ]);
+
+            // Zebra Striping
+            if (index % 2 !== 0) {
+                row.eachCell(cell => {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+                });
+            }
+
+            // Cell Styling
+            row.eachCell((cell, colNumber) => {
+                cell.font = { name: 'Inter', size: 10.5, color: { argb: 'FF334155' } };
+                cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'center' };
+                cell.border = { bottom: { style: 'thin', color: { argb: 'FFF1F5F9' } } };
+
+                // Status Indicators
+                if (colNumber === 7) { // Status column (shifted left)
+                    const val = cell.value as string;
+                    if (val === 'Active') cell.font = { ...cell.font, color: { argb: 'FF059669' }, bold: true };
+                    if (val === 'Hold') cell.font = { ...cell.font, color: { argb: 'FFD97706' }, bold: true };
+                }
+                if (colNumber === 9) { // Payment column (shifted left)
+                    const val = cell.value as string;
+                    if (val === 'Paid') cell.font = { ...cell.font, color: { argb: 'FF059669' }, bold: true };
+                    if (val === 'Unpaid') cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+                }
+            });
+            row.height = 28;
+        });
+
+        // 4. Set Column Widths - Balanced approach
+        worksheet.columns.forEach((column, i) => {
+            let maxLength = 0;
+            column.eachCell!({ includeEmpty: true }, (cell) => {
+                const columnLength = cell.value ? cell.value.toString().length : 0;
+                if (columnLength > maxLength) {
+                    maxLength = columnLength;
+                }
+            });
+            // Tighten weights for a "clean" feel
+            column.width = Math.max(10, Math.min(maxLength + 4, 35));
+        });
+
+        // 5. Generate and Download
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `AAA_Student_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
     };
 
     if (loading) {
@@ -366,7 +447,7 @@ export default function StudentsPage() {
         <div className="w-full max-w-[1800px] mx-auto space-y-10 pb-20 font-sans">
             
             {/* Header Area */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/40 backdrop-blur-md p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/40 backdrop-blur-md p-5 sm:p-8 rounded-2xl sm:rounded-3xl border border-white/50 shadow-sm transition-all duration-300">
                 <div className="flex items-center gap-4 sm:gap-5">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-[1.25rem] bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 shrink-0">
                         <Users size={20} className="sm:hidden" />
@@ -379,25 +460,24 @@ export default function StudentsPage() {
                                 {filteredAndSortedStudents.length} TOTAL
                             </span>
                         </h1>
-                        <p className="text-[11px] sm:text-sm font-medium text-slate-500 mt-0.5 sm:mt-1">Manage student directory and academic records</p>
                     </div>
                  </div>
 
                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <button
+                     <button
                         onClick={handleExport}
-                        className="p-3 sm:p-3.5 bg-white text-slate-500 rounded-[1.25rem] hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all border border-slate-100 shadow-sm hover:shadow-lg active:scale-95 group"
-                        title="Export Report"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:px-6 sm:py-3.5 bg-white text-slate-700 rounded-[1.25rem] font-black text-xs sm:text-sm hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all border border-slate-100 shadow-sm hover:shadow-lg active:scale-95 group"
                     >
-                        <Download size={18} className="sm:hidden" />
-                        <Download size={20} className="hidden sm:block transition-transform group-hover:scale-110" />
+                        <Download size={18} className="rotate-180 text-slate-400 group-hover:text-emerald-600 transition-colors sm:hidden" />
+                        <Download size={20} className="rotate-180 text-slate-400 group-hover:text-emerald-600 transition-colors hidden sm:block group-hover:scale-110" />
+                        <span>Export</span>
                     </button>
                     <button
                         onClick={() => setShowImportModal(true)}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:px-6 sm:py-3.5 bg-white text-slate-700 rounded-[1.25rem] font-black text-xs sm:text-sm hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all border border-slate-100 shadow-sm hover:shadow-lg active:scale-95 group"
                     >
-                        <Download size={18} className="rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors sm:hidden" />
-                        <Download size={20} className="rotate-180 text-slate-400 group-hover:text-indigo-600 transition-colors hidden sm:block" />
+                        <Download size={18} className="text-slate-400 group-hover:text-indigo-600 transition-colors sm:hidden" />
+                        <Download size={20} className="text-slate-400 group-hover:text-indigo-600 transition-colors hidden sm:block group-hover:scale-110" />
                         <span>Import</span>
                     </button>
                     <button
@@ -412,7 +492,7 @@ export default function StudentsPage() {
             </div>
 
             {/* Toolbar Area */}
-            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300 relative z-30">
+            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/50 shadow-sm transition-all duration-300 relative z-30">
                     {/* Left: Search Bar & View Controls */}
                     <div className="flex flex-wrap items-center gap-3 w-full">
                         <div className="relative w-full md:max-w-[300px] group">
@@ -597,14 +677,14 @@ export default function StudentsPage() {
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filteredAndSortedStudents.length === 0 ? (
+                                {paginatedStudents.length === 0 ? (
                                     <tr>
                                         <td colSpan={visibleColumns.length + 1} className="p-16 text-center text-slate-400 text-sm font-medium">
                                             No students found matching your criteria.
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredAndSortedStudents.map(student => (
+                                    paginatedStudents.map(student => (
                                         <tr key={student.student_id} className={`hover:bg-slate-50/80 transition-colors group ${selectedStudents.has(student.student_id) ? 'bg-indigo-50/30' : ''}`}>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center">
@@ -660,17 +740,6 @@ export default function StudentsPage() {
                                                                     title="Insurance"
                                                                 >
                                                                     <Shield size={16} />
-                                                                </button>
-                                                                <div className="w-px h-6 bg-slate-100 mx-1"/>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        handleDelete(student.student_id);
-                                                                        setActiveActionId(null);
-                                                                    }}
-                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                                                    title="Delete"
-                                                                >
-                                                                    <Trash2 size={16} />
                                                                 </button>
                                                             </div>
                                                         </>
@@ -810,6 +879,52 @@ export default function StudentsPage() {
                 </div>
             </div>
 
+            {/* Pagination UI */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-end bg-white/60 backdrop-blur-md px-8 py-5 rounded-[2rem] border border-white/50 shadow-sm mt-6">
+                    
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                        >
+                            <ChevronDown size={20} className="rotate-90" />
+                        </button>
+                        
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                .map((p, i, arr) => (
+                                    <div key={p} className="flex items-center gap-1">
+                                        {i > 0 && arr[i-1] !== p - 1 && (
+                                            <span className="text-slate-300 px-1">...</span>
+                                        )}
+                                        <button
+                                            onClick={() => setCurrentPage(p)}
+                                            className={`w-10 h-10 flex items-center justify-center rounded-xl font-black text-sm transition-all active:scale-95 ${
+                                                currentPage === p 
+                                                ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' 
+                                                : 'bg-white border border-slate-100 text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    </div>
+                                ))}
+                        </div>
+
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                        >
+                            <ChevronDown size={20} className="-rotate-90" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* MODALS */}
             {showInsuranceModal && (
                 <AddInsuranceModal
@@ -843,13 +958,6 @@ export default function StudentsPage() {
                         <div className="w-px h-8 bg-white/10" />
                         
                         <div className="flex items-center gap-4">
-                            <button 
-                                onClick={handleBulkDelete}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-rose-500/10 text-rose-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all active:scale-95"
-                            >
-                                <Trash2 size={16} />
-                                <span>Delete</span>
-                            </button>
                             <button 
                                 onClick={() => setSelectedStudents(new Set())}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-white/5 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all active:scale-95"

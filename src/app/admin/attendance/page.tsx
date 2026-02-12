@@ -147,10 +147,25 @@ export default function TrackAttendancePage() {
             return programs.filter(p => currentTerm.program_ids.includes(p.id));
         }
         if (selectedBranch) {
-            return programs.filter(p => p.branchId === selectedBranch);
+            // Find programs associated with any term in this branch
+            const branchTermProgramIds = terms
+                .filter(t => t.branch_id === selectedBranch)
+                .flatMap(t => t.program_ids || []);
+            
+            // Find programs that have at least one class in this branch
+            const branchClassProgramIds = classes
+                .filter(cls => cls.branchId === selectedBranch)
+                .map(cls => cls.programId);
+
+            const validIds = new Set([...branchTermProgramIds, ...branchClassProgramIds]);
+
+            return programs.filter(p => 
+                p.branchId === selectedBranch || 
+                validIds.has(p.id)
+            );
         }
         return programs;
-    }, [programs, currentTerm, selectedBranch]);
+    }, [programs, currentTerm, selectedBranch, terms, classes]);
 
     // Filter classes by term's branch, selected program, and selected day
     // Filter classes by term's branch, selected program, and selected day
@@ -568,11 +583,11 @@ export default function TrackAttendancePage() {
                             <tr>
                                 <th style="width: 30px;">No.</th>
                                 <th class="student-name">Student Name</th>
+                                <th style="width: 100px;">Session</th>
                                 ${Array.from({ length: totalSessions }).map((_, i) => {
                                     const date = dates[i + 1] ? new Date(dates[i + 1]).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '';
                                     return `
                                         <th class="session-header">
-                                            S${i+1}
                                             ${date ? `<span class="date-sub">${date}</span>` : ''}
                                         </th>
                                     `;
@@ -609,6 +624,9 @@ export default function TrackAttendancePage() {
                                         <td>${idx + 1}</td>
                                         <td class="student-name">
                                             ${item.student?.student_name.toUpperCase()}
+                                        </td>
+                                        <td style="font-size: 10px; font-weight: bold; color: #475569; text-align: center;">
+                                            ${(cls.totalSessions || 12) - (item.enrollment.start_session || 1) + 1} Session
                                         </td>
                                         ${sessionCells}
                                         <td></td>
@@ -678,10 +696,7 @@ export default function TrackAttendancePage() {
                     </button>
                     <div>
                         <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">Attendance</h1>
-                        <p className="text-slate-500 font-bold flex items-center gap-2 text-xs uppercase tracking-widest">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            Real-time Tracking Center
-                        </p>
+
                     </div>
                 </div>
 
@@ -725,7 +740,7 @@ export default function TrackAttendancePage() {
             </div>
 
             {/* Filter & Search Bar Section */}
-            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] border border-white/50 shadow-sm transition-all duration-300">
+            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/50 shadow-sm transition-all duration-300">
                 <div className="flex flex-col xl:flex-row items-center gap-4 sm:gap-6 mb-4 sm:mb-8">
                     {/* Search Bar */}
                     <div className="flex-1 w-full md:max-w-[300px] group relative">
@@ -854,86 +869,68 @@ export default function TrackAttendancePage() {
                         </select>
                     </div>
 
-                    {/* Show Inactive Toggle */}
-                    <div className="flex items-end pb-1">
-                        <label className="flex items-center gap-3 cursor-pointer group/toggle">
-                            <div className="relative">
-                                <input 
-                                    type="checkbox" 
-                                    checked={showInactive}
-                                    onChange={(e) => setShowInactive(e.target.checked)}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-12 h-6 bg-slate-200 rounded-full peer peer-checked:bg-indigo-600 transition-all duration-300 shadow-inner" />
-                                <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 peer-checked:left-7 shadow-sm" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 group-hover/toggle:text-indigo-600 transition-colors">History View</span>
-                                <span className="text-xs font-bold text-slate-600">Show Inactive Students</span>
-                            </div>
-                        </label>
-                    </div>
+
                 </div>
             </div>
 
             {/* Attendance Stats Cards */}
             {displayClasses.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] p-8 text-white shadow-xl shadow-indigo-200/50 group transition-all duration-500 hover:scale-[1.02]">
+                    <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-5 text-white shadow-lg shadow-indigo-100 group transition-all duration-500 hover:scale-[1.02]">
                         <div className="relative z-10">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                                    <Users size={24} />
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                                    <Users size={20} />
                                 </div>
-                                <h3 className="text-sm font-black uppercase tracking-widest opacity-80">Total Students</h3>
+                                <h3 className="text-[11px] font-black uppercase tracking-widest opacity-80">Total Students</h3>
                             </div>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-black">
-                                    {displayClasses.reduce((sum, cls) => sum + getClassEnrollments(cls.class_id).length, 0)}
+                                <span className="text-3xl font-black">
+                                    ${displayClasses.reduce((sum, cls) => sum + getClassEnrollments(cls.class_id).length, 0)}
                                 </span>
-                                <span className="text-lg font-bold opacity-60">across selection</span>
+                                <span className="text-xs font-bold opacity-60">in view</span>
                             </div>
                         </div>
-                        <Users size={120} className="absolute -right-8 -bottom-8 text-white/10 group-hover:scale-110 transition-transform duration-700" />
+                        <Users size={80} className="absolute -right-4 -bottom-4 text-white/10 group-hover:scale-110 transition-transform duration-700" />
                     </div>
 
-                    <div className="relative overflow-hidden bg-white/60 backdrop-blur-md border border-white/50 rounded-[2rem] p-8 shadow-sm group transition-all duration-500 hover:shadow-xl hover:shadow-emerald-50 hover:scale-[1.02]">
+                    <div className="relative overflow-hidden bg-white/80 backdrop-blur-md border border-slate-100 rounded-3xl p-5 shadow-sm group transition-all duration-500 hover:shadow-md hover:scale-[1.02]">
                         <div className="relative z-10">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                    <CheckCircle2 size={24} />
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                    <CheckCircle2 size={20} />
                                 </div>
-                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Present (Latest)</h3>
+                                <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400">Present</h3>
                             </div>
-                            <div className="flex items-baseline gap-3">
-                                <span className="text-5xl font-black text-slate-900 tracking-tighter">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-slate-900 tracking-tight">
                                     {presentCount}
                                 </span>
                                 <div className="flex flex-col">
-                                    <span className="text-emerald-600 font-black text-xs uppercase tracking-widest">Recorded</span>
-                                    <span className="text-slate-400 font-bold text-xs">{latestDateLabel}</span>
+                                    <span className="text-emerald-600 font-black text-[9px] uppercase tracking-wider">Latest</span>
+                                    <span className="text-slate-400 font-bold text-[9px]">{latestDateLabel}</span>
                                 </div>
                             </div>
                         </div>
-                        <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-emerald-500/5 sm:size-[120px] sm:-right-8 sm:-bottom-8 group-hover:scale-110 transition-transform duration-700" />
+                        <CheckCircle2 size={70} className="absolute -right-4 -bottom-4 text-emerald-500/5 group-hover:scale-110 transition-transform duration-700" />
                     </div>
 
-                    <div className="relative overflow-hidden bg-white/60 backdrop-blur-md border border-white/50 rounded-[2rem] p-8 shadow-sm group transition-all duration-500 hover:shadow-xl hover:shadow-indigo-50 hover:scale-[1.02]">
+                    <div className="relative overflow-hidden bg-white/80 backdrop-blur-md border border-slate-100 rounded-3xl p-5 shadow-sm group transition-all duration-500 hover:shadow-md hover:scale-[1.02]">
                         <div className="relative z-10">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                    <BookOpen size={24} />
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                    <BookOpen size={20} />
                                 </div>
-                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Total Classes</h3>
+                                <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400">Total Classes</h3>
                             </div>
-                            <div className="flex items-baseline gap-3">
-                                <span className="text-5xl font-black text-slate-900 tracking-tighter">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-slate-900 tracking-tight">
                                     {displayClasses.length}
                                 </span>
-                                <span className="text-indigo-600 font-black text-xs uppercase tracking-widest">Active View</span>
+                                <span className="text-indigo-600 font-black text-[9px] uppercase tracking-wider">Active View</span>
                             </div>
                         </div>
-                        <BookOpen size={120} className="absolute -right-8 -bottom-8 text-indigo-500/5 group-hover:scale-110 transition-transform duration-700" />
+                        <BookOpen size={70} className="absolute -right-4 -bottom-4 text-indigo-500/5 group-hover:scale-110 transition-transform duration-700" />
                     </div>
                 </div>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Building2, 
@@ -21,8 +21,9 @@ import {
   MoreVertical,
   Check,
   Camera,
-  Trash2,
-  X
+  X,
+  Edit,
+  ChevronDown,
 } from "lucide-react";
 import { 
   getSchoolDetails, 
@@ -37,7 +38,6 @@ import {
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { School as SchoolType, Branch, Class, Enrollment } from "@/lib/types";
-import { Suspense } from "react";
 
 export default function SetupPage() {
   return (
@@ -106,11 +106,7 @@ function SetupContent() {
               </div>
               <div>
                   <h1 className="text-3xl font-black text-slate-900 tracking-tight">System Configuration</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Academic Architecture</span>
-                      <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Global Setup</span>
-                  </div>
+
               </div>
           </div>
           
@@ -171,6 +167,7 @@ function SetupContent() {
                        </div>
                    ) : (
                        <ProgramList 
+                            branches={branches}
                             classes={classes} 
                             enrollments={enrollments} 
                             onAdd={() => setShowAddForm(true)}
@@ -296,63 +293,99 @@ function BranchList({ branches, enrollments, onAdd }: any) {
     )
 }
 
-function ProgramList({ classes, enrollments, onAdd, onEdit, onDelete }: any) {
+function ProgramList({ branches, classes, enrollments, onAdd, onEdit, onDelete }: any) {
     const [programs, setPrograms] = useState<any[]>([]);
+    const [selectedBranch, setSelectedBranch] = useState<string>("");
 
     useEffect(() => {
         const unsubscribe = programService.subscribe(setPrograms);
         return () => unsubscribe();
     }, []);
 
+    const filteredPrograms = programs.filter(p => !selectedBranch || p.branchId === selectedBranch);
+
     return (
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
-             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-center md:justify-between bg-white flex-wrap gap-4">
-                <div>
-                     <h2 className="text-xl font-bold text-slate-800">Academic Programs</h2>
-                     <p className="text-slate-400 text-sm font-medium">Curriculum and fee structures.</p>
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+             <div className="px-8 py-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between bg-white gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <GraduationCap size={24} />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Academic Programs</h2>
+                        <p className="text-slate-400 text-sm font-medium uppercase tracking-widest text-[10px] mt-1">Curriculum and fee structures</p>
+                    </div>
                 </div>
-                <button onClick={onAdd} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-                    <Plus size={18} />
-                    <span>New Program</span>
-                </button>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    {/* Branch Filter */}
+                    <div className="relative group w-full sm:w-64">
+                        <select 
+                            value={selectedBranch}
+                            onChange={(e) => setSelectedBranch(e.target.value)}
+                            className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer appearance-none pr-10"
+                        >
+                            <option value="">All Branches</option>
+                            {branches.map((b: any) => (
+                                <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                             <ChevronDown size={16} />
+                        </div>
+                    </div>
+
+                    <button onClick={onAdd} className="flex items-center gap-2 px-8 py-3.5 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 w-full sm:w-auto justify-center active:scale-95">
+                        <Plus size={18} />
+                        <span>New Program</span>
+                    </button>
+                </div>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-8 bg-slate-50/30">
-                 {programs.length === 0 ? (
-                      <div className="col-span-full py-12 text-center text-slate-400 font-medium">No programs found. Create one to get started.</div>
-                 ) : programs.map(p => (
-                      <div key={p.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                 {filteredPrograms.length === 0 ? (
+                      <div className="col-span-full py-20 text-center space-y-4">
+                           <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-300 flex items-center justify-center mx-auto">
+                                <BookOpen size={32} />
+                           </div>
+                           <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No programs found matching filters</p>
+                      </div>
+                 ) : filteredPrograms.map(p => (
+                      <div key={p.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative">
                            <div className="flex justify-between items-start mb-4">
-                               <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                               <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
                                    <GraduationCap size={24} />
                                </div>
-                               <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => onEdit(p)}
-                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                    >
-                                        <Settings size={16} />
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            if(confirm('Are you sure you want to delete this program?')) {
-                                                onDelete(p.id);
-                                            }
-                                        }}
-                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                               <button 
+                                   onClick={() => onEdit(p)}
+                                   className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                               >
+                                   <Settings size={18} />
+                               </button>
+                           </div>
+
+                           <div className="space-y-1 mb-4">
+                                <div className="flex justify-between items-center">
+                                     <h3 className="text-lg font-black text-slate-800 tracking-tight">{p.name}</h3>
+                                     <span className="text-xl font-black text-slate-900">${p.price}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                                         {branches.find((b: any) => b.branch_id === p.branchId)?.branch_name || 'Across Branches'}
+                                     </span>
+                                </div>
+                           </div>
+
+                           <div className="flex items-center gap-4">
+                               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                                    <Calendar size={12} className="text-indigo-400" />
+                                    <span>{p.durationSessions} Sessions</span>
                                </div>
-                           </div>
-                           <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-lg font-bold text-slate-800">{p.name}</h3>
-                                <span className="px-3 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-bold">
-                                   ${p.price}
-                                </span>
-                           </div>
-                           <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
-                               <span className="flex items-center gap-1"><Calendar size={12}/> {p.durationSessions} Sessions</span>
+                                {p.session_fee && (
+                                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest leading-none">
+                                        <span>${p.session_fee}/S</span>
+                                   </div>
+                                )}
                            </div>
                       </div>
                  ))}

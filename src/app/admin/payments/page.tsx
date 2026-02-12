@@ -5,12 +5,14 @@ import { subscribeToStudents, subscribeToClasses, subscribeToEnrollments, update
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { Student, Class, Enrollment, Branch } from "@/lib/types";
-import { Search, Loader2, Calendar, FileText, Download, Trash2, Filter, CheckCircle, ArrowLeft, ChevronDown, ChevronUp, AlertCircle, Users, DollarSign, Eye } from "lucide-react";
+import { Search, Loader2, Calendar, FileText, Download, Filter, CheckCircle, ArrowLeft, ChevronDown, ChevronUp, AlertCircle, Users, DollarSign, Eye, Pencil } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { useAuth } from "@/lib/useAuth";
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function PaymentsPage() {
+  const { profile } = useAuth();
   const router = useRouter();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -65,7 +67,8 @@ export default function PaymentsPage() {
        }
   }
 
-  async function handleDelete(id: string) {
+
+   async function handleDelete(id: string) {
       if (!confirm("Are you sure you want to delete this payment record? This action cannot be undone.")) return;
       try {
           await deleteEnrollment(id);
@@ -73,7 +76,7 @@ export default function PaymentsPage() {
           console.error(err);
           alert("Failed to delete record");
       }
-  }
+   }
 
   async function performBulkPay() {
       if (!selectedClassId || selectedClassId === 'all') return;
@@ -178,13 +181,7 @@ export default function PaymentsPage() {
           const isPaidAmount = Number(enr.paid_amount) >= total;
           const dueDate = enr.payment_due_date || enr.payment_expired; // Fallback for legacy data
           
-          let status = 'Unpaid';
-          if (isPaidAmount) status = 'Paid';
-          
-          if (enr.enrollment_status && enr.enrollment_status !== 'Active') {
-              status = enr.enrollment_status; 
-          } 
-
+          let status = isPaidAmount ? 'Paid' : 'Unpaid';
           return {
               id: enr.enrollment_id,
               studentName: student?.student_name || 'Unknown',
@@ -289,7 +286,7 @@ export default function PaymentsPage() {
                 >
                     <Download size={14} className="sm:hidden" />
                     <Download size={16} className="hidden sm:block group-hover:-translate-y-0.5 transition-transform" />
-                    <span>Report</span>
+                    <span>Export</span>
                 </button>
             </div>
         </div>
@@ -375,7 +372,7 @@ export default function PaymentsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div ref={componentRef} className="p-2 overflow-x-auto">
                 {/* Print Header */}
                 <div className="hidden print:block text-center mb-8 pt-4">
@@ -406,6 +403,13 @@ export default function PaymentsPage() {
                                     key={idx} 
                                     group={group} 
                                     onViewHistory={() => setHistoryStudent(group)}
+                                    onEdit={() => {
+                                        // Edit the first unpaid enrollment, or the first one if all are paid
+                                        const unpaidItem = group.items.find((item: any) => item.status === 'Unpaid') || group.items[0];
+                                        if (unpaidItem) {
+                                            setEditingPayment(unpaidItem);
+                                        }
+                                    }}
                                 />
                             ))
                         )}
@@ -415,10 +419,7 @@ export default function PaymentsPage() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        Showing page {currentPage} of {totalPages}
-                    </p>
+                <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/30 flex justify-end items-center gap-4">
                     <div className="flex items-center gap-2">
                         <button 
                             disabled={currentPage === 1}
@@ -593,6 +594,7 @@ export default function PaymentsPage() {
                                         <th className="py-5 px-6 text-right">Fee Details</th>
                                         <th className="py-5 px-6 text-right">Due Date</th>
                                         <th className="py-5 px-6 text-center">Status</th>
+                                        <th className="py-5 px-6 text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -651,6 +653,14 @@ export default function PaymentsPage() {
                                                     {item.status}
                                                 </span>
                                             </td>
+                                            <td className="py-5 px-6 text-center">
+                                                <button 
+                                                    onClick={() => setEditingPayment(item)}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all active:scale-95 mx-auto"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -684,7 +694,8 @@ export default function PaymentsPage() {
   );
 }
 
-function PaymentGroupRow({ group, onViewHistory }: { group: any, onViewHistory: any }) {
+function PaymentGroupRow({ group, onViewHistory, onEdit }: { group: any, onViewHistory: any, onEdit: any }) {
+    const { profile } = useAuth();
     // Derived Group Status
     const netTotal = group.totalFee - group.totalDiscount;
     const isFullyPaid = group.totalPaid >= netTotal;
@@ -695,16 +706,28 @@ function PaymentGroupRow({ group, onViewHistory }: { group: any, onViewHistory: 
             className="group hover:bg-slate-50 transition-all border-l-4 border-l-transparent"
         >
             <td className="py-4 px-6 print:hidden">
-                <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onViewHistory();
-                    }}
-                    title="View Student Payment History"
-                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-lg hover:shadow-blue-50 transition-all active:scale-95"
-                >
-                   <Eye size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onViewHistory();
+                        }}
+                        title="View Student Payment History"
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-lg hover:shadow-blue-50 transition-all active:scale-95"
+                    >
+                       <Eye size={18} />
+                    </button>
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit();
+                        }}
+                        title="Edit Payment"
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-lg hover:shadow-indigo-50 transition-all active:scale-95"
+                    >
+                       <Pencil size={18} />
+                    </button>
+                </div>
             </td>
                 <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
@@ -764,7 +787,7 @@ function PaymentGroupRow({ group, onViewHistory }: { group: any, onViewHistory: 
                             ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
                             : 'bg-rose-50 text-rose-600 border-rose-100'
                     }`}>
-                        {isFullyPaid ? 'Fully Paid' : 'Unpaid'}
+                        {isFullyPaid ? 'Paid' : 'Unpaid'}
                     </span>
                 </td>
             </tr>

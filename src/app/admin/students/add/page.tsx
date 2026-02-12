@@ -27,9 +27,9 @@ import {
   Plus,
   X,
   Edit2,
-  Trash2,
   Eye,
-  Printer
+  Printer,
+  DollarSign
 } from "lucide-react";
 import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
@@ -889,20 +889,13 @@ export default function AddStudentPage() {
                                         </div>
                                         <p className="text-xs text-indigo-600 font-bold mt-2">${prog.price}</p>
                                     </div>
-                                     <div className="flex items-center gap-1">
+                                      <div className="flex items-center gap-1">
                                          <button 
                                             onClick={() => handleEditProgram(idx)}
                                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                                             title="Edit Details"
                                         >
                                             <Edit2 size={16} />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleRemoveProgram(idx)}
-                                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                            title="Remove Program"
-                                        >
-                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -1025,153 +1018,237 @@ export default function AddStudentPage() {
                 </div>
             )}
 
-            {/* STEP 4: Invoice */}
-            {currentStep === 4 && createdStudent && (
-                <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                    
-                    <div className="flex justify-center gap-4 py-4 print:hidden">
-                        <button
-                            onClick={handlePrint}
-                            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
-                        >
-                            <Printer size={18} />
-                            <span>Print Invoice</span>
-                        </button>
-                        <button
-                            onClick={() => router.push('/admin/students')}
-                            className="bg-white text-slate-600 px-6 py-3 rounded-xl font-bold text-sm border border-slate-200 hover:bg-slate-50 transition-all"
-                        >
-                            Finish & Return
-                        </button>
-                    </div>
+             {/* STEP 4: Invoice */}
+             {currentStep === 4 && createdStudent && (
+                 <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                     
+                     <div className="flex justify-center gap-4 py-4 print:hidden">
+                         <button
+                             onClick={handlePrint}
+                             className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
+                         >
+                             <Printer size={18} />
+                             <span>Print Invoice</span>
+                         </button>
+                         <button
+                             onClick={() => router.push('/admin/students')}
+                             className="bg-white text-slate-600 px-6 py-3 rounded-xl font-bold text-sm border border-slate-200 hover:bg-slate-50 transition-all"
+                         >
+                             Finish & Return
+                         </button>
+                     </div>
 
-                    {/* Invoice Paper Preview */}
-                    <div ref={invoiceRef} className="bg-white p-12 rounded-[24px] shadow-sm border border-slate-100 print:shadow-none print:border-none print:p-8">
-                        
+                     {/* Invoice Paper Preview */}
+                     <div ref={invoiceRef} className="bg-white p-12 rounded-none print:p-8 max-w-[210mm] mx-auto overflow-hidden text-slate-900 leading-tight border border-slate-100 mb-20">
+                         
+                         {/* Header & School Info */}
+                         <div className="flex justify-between items-center mb-10 pb-6 border-b-2 border-slate-900">
+                              <div className="flex items-center gap-6">
+                                 <div className="w-20 h-20 bg-white flex items-center justify-center overflow-hidden border border-slate-200">
+                                     {school?.logo_url ? (
+                                         <img src={school.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                                     ) : (
+                                         <span className="text-3xl font-black text-indigo-600">AAA</span>
+                                     )}
+                                 </div>
+                                 <div className="flex-1">
+                                     <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900 leading-none mb-1">{school?.school_name || "Authentic Advanced Academy"}</h1>
+                                     <div className="text-[11px] font-bold text-slate-600 space-y-0.5">
+                                         <p className="flex items-center gap-2"><MapPin size={12} className="text-slate-400" /> {school?.address || "1st Floor, Boeung Snor Food Village"}</p>
+                                         <p className="flex items-center gap-2"><Phone size={12} className="text-slate-400" /> {(school as any)?.phone || "089 284 3984"}</p>
+                                     </div>
+                                 </div>
+                             </div>
+                             <div className="text-right">
+                                 <div className="bg-slate-900 text-white px-6 py-2 rounded-lg inline-block mb-3">
+                                     <h2 className="text-xl font-black uppercase tracking-[0.2em]">Official Receipt</h2>
+                                 </div>
+                                 <div className="space-y-1">
+                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Receipt No.</p>
+                                     <p className="font-mono text-lg font-black text-slate-900">#{Math.floor(100000 + Math.random() * 900000)}</p>
+                                 </div>
+                             </div>
+                         </div>
 
-                        {/* Header & School Info */}
-                        <div className="flex justify-between items-start mb-8 pb-8 border-b border-slate-100 print:border-slate-300">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm print:border-slate-300">
-                                    {school?.logo_url ? (
-                                        <img src={school.logo_url} alt="Logo" className="w-full h-full object-contain" />
-                                    ) : (
-                                        <span className="text-2xl font-black text-indigo-600">{school?.school_name?.charAt(0) || "A"}</span>
-                                    )}
-                                </div>
-                                <div>
-                                    <h1 className="text-xl font-black text-slate-800 tracking-tight">{school?.school_name || "Authentic Advanced Academy"}</h1>
-                                    <div className="text-xs font-medium text-slate-500 mt-1 space-y-0.5">
-                                        <p className="flex items-center gap-1.5"><MapPin size={11} /> {school?.address || "1st Floor, Boeung Snor Food Village"}</p>
-                                        <p className="flex items-center gap-1.5"><Phone size={11} /> {(school as any)?.phone || "089 284 3984"}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <h2 className="text-3xl font-black text-slate-200 tracking-tighter uppercase print:text-slate-400">Receipt</h2>
-                                <div className="mt-1 space-y-0.5">
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Receipt No</p>
-                                    <p className="font-mono text-sm font-bold text-slate-700">#{Math.floor(Math.random() * 100000).toString().padStart(6, '0')}</p>
-                                </div>
-                                <div className="mt-2 space-y-0.5">
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</p>
-                                    <p className="font-mono text-sm font-bold text-slate-700">{new Date().toLocaleDateString()}</p>
-                                </div>
-                            </div>
-                        </div>
+                         {/* Paper Form Fields */}
+                         <div className="space-y-8 mb-10">
+                             {/* Row 1: Name and Date */}
+                             <div className="flex items-end gap-10">
+                                 <div className="flex-1 flex items-end gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Student Name :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 text-center font-bold text-slate-800 text-sm">
+                                         {createdStudent.first_name} {createdStudent.last_name}
+                                     </div>
+                                 </div>
+                                 <div className="w-64 flex items-end gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Date :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 text-center font-bold text-slate-800 text-sm">
+                                         {new Date().toLocaleDateString('en-GB')}
+                                     </div>
+                                 </div>
+                             </div>
 
-                        {/* Student Info & Details */}
-                        <div className="grid grid-cols-2 gap-12 mb-10">
-                            <div>
-                                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-3">Bill To</p>
-                                <h3 className="text-lg font-bold text-slate-800 mb-1">{createdStudent.first_name} {createdStudent.last_name}</h3>
-                                <div className="space-y-1 text-sm text-slate-500 font-medium">
-                                    <p>ID: <span className="text-slate-700 font-bold">{createdStudent.student_code}</span></p>
-                                    <p>Gender: <span className="text-slate-700">{createdStudent.gender}</span></p>
-                                    <p>Branch: <span className="text-slate-700">{createdStudent.branch_name}</span></p>
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 print:bg-white print:border-slate-200 flex flex-col justify-center">
-                                <div className="grid grid-cols-3 gap-4 text-center">
-                                    <div className="space-y-1">
-                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Term</p>
-                                         <p className="text-sm font-bold text-slate-800">
-                                            {[...new Set(createdEnrollments.map(e => e.term))].join(', ')}
-                                        </p>
-                                    </div>
-                                    <div className="space-y-1 border-x border-slate-200 print:border-slate-200/50">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Method</p>
-                                        <p className="text-sm font-bold text-slate-800">{createdEnrollments[0]?.payment_type}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">
-                                            PAID
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                             {/* Row 2: Gender, Session, Schedule */}
+                             <div className="flex items-end gap-10">
+                                 <div className="flex items-center gap-6">
+                                      <span className="text-xs font-black uppercase mb-1">Gender :</span>
+                                      <div className="flex items-center gap-6">
+                                          <div className="flex items-center gap-2">
+                                              <div className={`w-4 h-4 border border-slate-900 rounded-sm flex items-center justify-center ${createdStudent.gender === 'Male' ? 'bg-slate-900' : ''}`}>
+                                                  {createdStudent.gender === 'Male' && <Check size={12} className="text-white" />}
+                                              </div>
+                                              <span className="text-xs font-bold">M</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <div className={`w-4 h-4 border border-slate-900 rounded-sm flex items-center justify-center ${createdStudent.gender === 'Female' ? 'bg-slate-900' : ''}`}>
+                                                  {createdStudent.gender === 'Female' && <Check size={12} className="text-white" />}
+                                              </div>
+                                              <span className="text-xs font-bold">F</span>
+                                          </div>
+                                      </div>
+                                 </div>
+                                 <div className="flex-1 flex items-end gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Session :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 text-center font-bold text-slate-800 text-sm">
+                                         {createdEnrollments[0]?.start_session || 1} - {(createdEnrollments[0] as any)?.total_sessions || 12}
+                                     </div>
+                                 </div>
+                                 <div className="flex-1 flex items-end gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Schedule :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 text-center font-bold text-slate-800 text-sm">
+                                         {createdEnrollments[0]?.class_name || "Full Day"}
+                                     </div>
+                                 </div>
+                             </div>
 
-                        {/* Table */}
-                        <table className="w-full mb-8 border-collapse">
-                            <thead>
-                                <tr className="border-b-2 border-slate-100">
-                                    <th className="py-3 pr-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Description</th>
-                                    <th className="py-3 px-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-32">Session</th>
-                                    <th className="py-3 pl-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider w-32">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50/50">
-                                {createdEnrollments.map((enr, idx) => (
-                                    <tr key={idx}>
-                                        <td className="py-4 pr-4 align-top">
-                                            <p className="font-bold text-slate-800 text-sm">{enr.program_name || "Tuition Fee"}</p>
-                                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 font-medium">
-                                                <span className="flex items-center gap-1.5"><BookOpen size={10} className="text-slate-400" /> {enr.class_name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-4 text-center align-top">
-                                             <span className="font-mono font-bold text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                                {enr.start_session}-{enr.total_sessions || 12}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 pl-4 text-right align-top">
-                                            <span className="font-bold text-slate-800 text-sm">${Number(enr.total_amount).toFixed(2)}</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                             {/* Row 3: Begin Payment Of */}
+                             <div className="space-y-4">
+                                 <span className="text-xs font-black uppercase block">Being Payment of :</span>
+                                 <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+                                     {createdEnrollments.map((enr, idx) => (
+                                         <div key={idx} className="flex items-center gap-3">
+                                             <div className="w-4 h-4 border border-slate-900 rounded-sm flex items-center justify-center bg-slate-900">
+                                                 <Check size={12} className="text-white" />
+                                             </div>
+                                             <span className="text-xs font-bold">{enr.program_name}</span>
+                                             <div className="flex-1 border-b border-slate-400 border-dotted" />
+                                         </div>
+                                     ))}
+                                     {/* Placeholders for others */}
+                                     {[...Array(Math.max(0, 4 - createdEnrollments.length))].map((_, i) => (
+                                         <div key={`empty-${i}`} className="flex items-center gap-3 opacity-30">
+                                             <div className="w-4 h-4 border border-slate-900 rounded-sm" />
+                                             <div className="flex-1 border-b border-slate-400 border-dotted mt-4" />
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
 
-                        {/* Totals */}
-                        <div className="flex justify-end pt-4 border-t-2 border-slate-100 print:border-slate-300">
-                            <div className="w-full max-w-xs space-y-2">
-                                <div className="flex justify-between text-xs font-bold text-slate-500">
-                                    <span>Total Amount</span>
-                                    <span>${createdEnrollments.reduce((sum, e) => sum + Number(e.total_amount), 0).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs font-bold text-emerald-600">
-                                    <span>Discount</span>
-                                    <span>-${createdEnrollments.reduce((sum, e) => sum + Number(e.discount || 0), 0).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs font-bold text-slate-500 pb-2 border-b border-slate-100 border-dashed">
-                                    <span>Paid Amount</span>
-                                    <span>-${createdEnrollments.reduce((sum, e) => sum + Number(e.paid_amount), 0).toFixed(2)}</span>
-                                </div>
+                             {/* Row 4: Term and Size */}
+                             <div className="flex items-end gap-10">
+                                 <div className="w-1/2 flex items-center gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Term :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 font-bold text-slate-800 text-sm">
+                                          {[...new Set(createdEnrollments.map(e => (e as any).term_name || e.term))].join(', ')}
+                                     </div>
+                                 </div>
+                                 <div className="w-1/2 flex items-center gap-3">
+                                     <span className="text-xs font-black uppercase whitespace-nowrap mb-1">Size :</span>
+                                     <div className="flex-1 border-b border-slate-900 pb-1 px-4 font-bold text-slate-800 text-sm">
+                                         {/* Blank for manual entry */}
+                                     </div>
+                                 </div>
+                             </div>
 
-                            </div>
-                        </div>
+                              {/* Amount Boxes Section */}
+                             <div className="flex gap-10 pt-4">
+                                 <div className="flex-1 space-y-4">
+                                     <div className="flex flex-col gap-3">
+                                         <span className="text-xs font-black uppercase items-center flex gap-2">
+                                             <DollarSign size={14} className="text-indigo-600" />
+                                             Total Amount (USD)
+                                         </span>
+                                         <div className="flex gap-2">
+                                             {Number(createdEnrollments.reduce((sum, e) => sum + (Number(e.total_amount) - Number(e.discount || 0)), 0)).toFixed(2).split('').map((char, i) => (
+                                                 <div key={i} className={`w-10 h-12 border-2 ${char === '.' ? 'border-transparent flex items-end justify-center pb-2 w-4' : 'border-slate-900 rounded-lg flex items-center justify-center font-black text-xl bg-slate-50'}`}>
+                                                     {char === '.' ? ',' : char}
+                                                 </div>
+                                             ))}
+                                             <div className="flex-1 flex items-center ml-2">
+                                                 <span className="text-2xl font-black">$</span>
+                                             </div>
+                                         </div>
+                                     </div>
+                                     <div className="flex flex-col gap-3">
+                                         <span className="text-xs font-black uppercase items-center flex gap-2">
+                                             <span className="text-indigo-600 font-black">៛</span>
+                                             Total Amount (Riel)
+                                         </span>
+                                         <div className="flex gap-2">
+                                             {(createdEnrollments.reduce((sum, e) => sum + (Number(e.total_amount) - Number(e.discount || 0)), 0) * 4100).toLocaleString('en-US').split('').map((char, i) => (
+                                                 <div key={i} className={`w-10 h-12 border-2 ${char === ',' ? 'border-transparent flex items-end justify-center pb-2 w-4' : 'border-slate-900 rounded-lg flex items-center justify-center font-black text-xl bg-slate-50'}`}>
+                                                     {char === ',' ? '.' : char}
+                                                 </div>
+                                             ))}
+                                             <div className="flex-1 flex items-center ml-2">
+                                                 <span className="text-2xl font-black">៛</span>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
 
-                        {/* Footer */}
-                        <div className="mt-20 pt-8 border-t border-dashed border-slate-200 text-center print:mt-10">
-                            <p className="text-slate-400 text-xs font-medium">Thank you for choosing Authentic Advanced Academy!</p>
-                        </div>
+                                 <div className="w-72 space-y-4">
+                                     <div className="p-4 border-2 border-slate-900 rounded-xl space-y-3">
+                                         <span className="text-[10px] font-black uppercase tracking-widest block text-center mb-2">Payment Method</span>
+                                         <div className="flex justify-around">
+                                             <div className="flex items-center gap-2">
+                                                 <div className={`w-4 h-4 border border-slate-900 rounded-sm flex items-center justify-center ${createdEnrollments[0]?.payment_type === 'Cash' ? 'bg-slate-900' : ''}`}>
+                                                     {createdEnrollments[0]?.payment_type === 'Cash' && <Check size={12} className="text-white" />}
+                                                 </div>
+                                                 <span className="text-xs font-bold">Cash</span>
+                                             </div>
+                                             <div className="flex items-center gap-2">
+                                                 <div className={`w-4 h-4 border border-slate-900 rounded-sm flex items-center justify-center ${createdEnrollments[0]?.payment_type === 'ABA' ? 'bg-slate-900' : ''}`}>
+                                                     {createdEnrollments[0]?.payment_type === 'ABA' && <Check size={12} className="text-white" />}
+                                                 </div>
+                                                 <span className="text-xs font-bold">ABA</span>
+                                             </div>
+                                         </div>
+                                         {createdEnrollments[0]?.payment_type === 'ABA' && (
+                                             <div className="mt-2 text-center">
+                                                 <p className="text-[10px] font-bold text-slate-400">Ref No. ________________</p>
+                                             </div>
+                                         )}
+                                     </div>
+                                     <div className="flex justify-center items-center h-20 bg-slate-50 border-2 border-slate-200 border-dashed rounded-xl">
+                                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Office Use Only</span>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
 
-                    </div>
-                    
-                </div>
-            )}
+                          {/* Footer Signatures */}
+                         <div className="mt-20 flex justify-between px-10">
+                             <div className="text-center w-64">
+                                 <div className="h-10 border-b border-slate-900 mb-2" />
+                                 <p className="text-xs font-black uppercase">Received By</p>
+                                 <p className="text-[10px] text-slate-400 font-bold mt-1">Admin Officer Signature</p>
+                             </div>
+                             <div className="text-center w-64">
+                                 <div className="h-10 border-b border-slate-900 mb-2" />
+                                 <p className="text-xs font-black uppercase">Student / Parent</p>
+                                 <p className="text-[10px] text-slate-400 font-bold mt-1">Authorized Signature</p>
+                             </div>
+                         </div>
+
+                         <div className="mt-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                             <p>Thank you for choosing Authentic Advanced Academy!</p>
+                             <p className="mt-1">Copyright © {new Date().getFullYear()} AAA. All rights reserved.</p>
+                         </div>
+
+                     </div>
+                 </div>
+             )}
                         
 
             {/* Add Program Dialog/Modal */}

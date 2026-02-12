@@ -79,12 +79,25 @@ textarea::placeholder {
   color: rgba(148, 163, 184, 0.8);
 }
 
+textarea:focus,
 input:focus,
-select:focus,
-textarea:focus {
+select:focus {
   border-color: rgba(99, 102, 241, 0.3);
   background-color: #ffffff;
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 label {

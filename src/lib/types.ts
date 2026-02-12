@@ -1,3 +1,13 @@
+export type UserRole = 'admin';
+
+export interface AppUser {
+    uid: string;
+    email: string | null;
+    role: UserRole;
+    name?: string;
+    createdAt?: string;
+}
+
 export type Role = 'Admin' | 'Teacher' | 'Student' | 'Parent';
 
 export type Gender = 'Male' | 'Female';

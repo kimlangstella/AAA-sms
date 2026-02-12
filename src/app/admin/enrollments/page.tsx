@@ -22,6 +22,7 @@ import { branchService } from "@/services/branchService";
 import { programService } from "@/services/programService";
 import { termService } from "@/services/termService";
 import { Term } from "@/lib/types";
+import { useAuth } from "@/lib/useAuth";
 
 /* =========================
    TYPES & HELPERS
@@ -44,6 +45,7 @@ const getPaymentStatus = (paid: number, total: number, discount: number = 0) => 
    ========================= */
 
 function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: { cls: Class, enrollments: Enrollment[], onClick: () => void, onEdit: () => void, onDelete: () => void, branchName: string }) {
+  const { profile } = useAuth();
   const router = useRouter();
   const activeEnrollments = enrollments.filter(e => e.class_id === cls.class_id);
   const count = activeEnrollments.length;
@@ -130,13 +132,6 @@ function ClassCard({ cls, enrollments, onClick, onEdit, onDelete, branchName }: 
                     <Pencil size={14} />
                 </button>
                 <button 
-                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                    title="Delete Class"
-                >
-                    <Trash2 size={14} />
-                </button>
-                <button 
                     onClick={handleViewAttendance}
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                     title="View Attendance"
@@ -198,13 +193,6 @@ function ClassListRow({ cls, enrollments, onClick, onEdit, onDelete, branchName 
               >
                   <Pencil size={14} />
               </button>
-              <button 
-                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
-                 title="Delete Class"
-              >
-                  <Trash2 size={14} />
-              </button>
            </div>
        </div>
     </div>
@@ -213,6 +201,7 @@ function ClassListRow({ cls, enrollments, onClick, onEdit, onDelete, branchName 
 
 
 function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: Enrollment; onRemove: () => void; onViewInvoice: () => void }) {
+  const { profile } = useAuth();
   const student = enrollment.student;
   const isPaidAmount = getPaymentStatus(enrollment.paid_amount || 0, enrollment.total_amount || 0, enrollment.discount || 0) === 'Paid';
   
@@ -256,12 +245,6 @@ function EnrollmentCard({ enrollment, onRemove, onViewInvoice }: { enrollment: E
            </div>
           
           <div className="flex items-center gap-1">
-            <button 
-               onClick={(e) => { e.stopPropagation(); onRemove(); }}
-               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
-            >
-               <Trash2 size={16} />
-            </button>
             
             <button 
                onClick={(e) => { e.stopPropagation(); onViewInvoice(); }}
@@ -495,7 +478,7 @@ export default function EnrollmentsPage() {
     }
 
     return result;
-  }, [classes, searchQuery, filterBranch, filterProgram]);
+  }, [classes, searchQuery, filterBranch, filterProgram, filterDay]);
 
   // Get the active term for default display
   const activeTerm = useMemo(() => terms.find(t => t.status === 'Active'), [terms]);
