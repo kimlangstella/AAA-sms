@@ -61,7 +61,7 @@ export default function InsurancePage() {
 
   useEffect(() => {
     const unsubTerms = termService.subscribe(setTerms);
-    const unsubBranches = branchService.subscribe(setBranches, profile?.role === 'admin' ? profile.branchIds : []);
+    const unsubBranches = branchService.subscribe(setBranches, []); // Both admin and superAdmin see all
     return () => {
         unsubTerms();
         unsubBranches();

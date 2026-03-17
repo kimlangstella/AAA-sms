@@ -151,7 +151,7 @@ export default function AddStudentPage() {
 
   useEffect(() => {
     if (!profile) return;
-    const branchIds = profile.role === 'admin' ? profile.branchIds : [];
+    const branchIds: string[] = []; // Fetch all data regardless of role (admin/superAdmin)
     console.log("Subscription Profile:", profile.role, "Branch IDs:", branchIds);
     const unsubBranches = branchService.subscribe(setBranches, branchIds);
     

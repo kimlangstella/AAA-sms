@@ -18,7 +18,7 @@ export default function BranchesPage() {
   useEffect(() => {
     if (!profile) return;
     
-    const branchIds = profile.role === 'admin' ? profile.branchIds : [];
+    const branchIds: string[] = []; // Fetch all data regardless of role (admin/superAdmin)
     
     const unsub = branchService.subscribe((data) => {
         setBranches(data);

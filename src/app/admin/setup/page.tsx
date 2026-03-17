@@ -72,7 +72,7 @@ function SetupContent() {
   useEffect(() => {
     if (!profile) return;
     
-    const branchIds = profile.role === 'admin' ? profile.branchIds : [];
+    const branchIds: string[] = []; // Fetch all data regardless of role (admin/superAdmin)
 
     const unsubSchool = subscribeToSchoolDetails(setSchool);
     const unsubBranches = branchService.subscribe(setBranches, branchIds);

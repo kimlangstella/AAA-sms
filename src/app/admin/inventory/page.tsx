@@ -65,7 +65,7 @@ export default function InventoryDashboard() {
     // Data Fetching
     useEffect(() => {
         if (!profile) return;
-        const branchIds = []; // Fetch all data regardless of role (admin/superAdmin)
+        const branchIds: string[] = []; // Fetch all data regardless of role (admin/superAdmin)
         const unsubBranches = branchService.subscribe(setBranches, branchIds);
         const unsubInventory = inventoryService.subscribe((data) => {
             setItems(data);
