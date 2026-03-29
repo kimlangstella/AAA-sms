@@ -250,7 +250,7 @@ export default function AddStudentPage() {
                       sessionsToEnroll = classTotalSessions; // Default to full 11 for FM
                   }
                   
-                  setNewProgramData(prev => ({ ...prev, start_session: sessionsToEnroll.toString() }));
+                  setNewProgramData((prev: any) => ({ ...prev, start_session: sessionsToEnroll.toString() }));
               }
           }
       };
@@ -1646,9 +1646,9 @@ export default function AddStudentPage() {
                                     setSelectedProgramName(name);
                                     const matching = programs.filter(p => p.name === name);
                                     if (matching.length === 1) {
-                                        setNewProgramData(prev => ({ ...prev, program_id: matching[0].id, class_id: "" }));
+                                        setNewProgramData((prev: any) => ({ ...prev, program_id: matching[0].id, class_id: "" }));
                                     } else {
-                                        setNewProgramData(prev => ({ ...prev, program_id: "", class_id: "" }));
+                                        setNewProgramData((prev: any) => ({ ...prev, program_id: "", class_id: "" }));
                                     }
                                 }}
                                 required
@@ -1822,7 +1822,7 @@ export default function AddStudentPage() {
                                     min="1"
                                     max="50"
                                     value={newProgramData.start_session} 
-                                    onChange={(e: any) => setNewProgramData(prev => ({ ...prev, start_session: e.target.value }))}
+                                    onChange={(e: any) => setNewProgramData((prev: any) => ({ ...prev, start_session: e.target.value }))}
                                     required 
                                 />
                                 {newProgramData.class_id && (
@@ -1837,7 +1837,7 @@ export default function AddStudentPage() {
                                 name="admission_date" 
                                 type="date" 
                                 value={newProgramData.admission_date} 
-                                onChange={(e: any) => setNewProgramData(prev => ({ ...prev, admission_date: e.target.value }))}
+                                onChange={(e: any) => setNewProgramData((prev: any) => ({ ...prev, admission_date: e.target.value }))}
                                 required 
                             />
                         </div>
@@ -1845,7 +1845,7 @@ export default function AddStudentPage() {
                         {/* Custom Checkbox Card */}
                         <div 
                             onClick={() => {
-                                setNewProgramData(prev => ({ ...prev, include_next_term: !prev.include_next_term }));
+                                setNewProgramData((prev: any) => ({ ...prev, include_next_term: !prev.include_next_term }));
                             }}
                             className={`relative cursor-pointer group flex items-start gap-4 p-5 rounded-2xl border-2 transition-all duration-200 ${newProgramData.include_next_term ? 'border-indigo-500 bg-indigo-50/10' : 'border-slate-100 bg-slate-50 hover:border-indigo-200'}`}
                         >

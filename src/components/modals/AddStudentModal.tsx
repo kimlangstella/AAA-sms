@@ -282,7 +282,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
                     sessionsToEnroll = classTotalSessions; // Default to 11 for FM
                 }
 
-                setNewProgramData(prev => ({ ...prev, start_session: sessionsToEnroll.toString() }));
+                setNewProgramData((prev: any) => ({ ...prev, start_session: sessionsToEnroll.toString() }));
             }
         }
     };
@@ -880,7 +880,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
                                         label="Program" 
                                         name="program_id" 
                                         value={newProgramData.program_id} 
-                                        onChange={(e: any) => setNewProgramData(prev => ({ ...prev, program_id: e.target.value }))}
+                                        onChange={(e: any) => setNewProgramData((prev: any) => ({ ...prev, program_id: e.target.value }))}
                                         required
                                     >
                                         <option value="">Select Program</option>
@@ -898,7 +898,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
                                                 {programs.find(p => p.id === newProgramData.program_id)?.variants.map((v: any) => (
                                                     <div 
                                                         key={v.id}
-                                                        onClick={() => setNewProgramData(prev => ({ ...prev, variant_id: v.id }))}
+                                                        onClick={() => setNewProgramData((prev: any) => ({ ...prev, variant_id: v.id }))}
                                                         className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex justify-between items-center group ${
                                                             newProgramData.variant_id === v.id 
                                                                 ? 'border-indigo-500 bg-indigo-50/30' 
@@ -928,7 +928,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
                                         label="Class" 
                                         name="class_id" 
                                         value={newProgramData.class_id} 
-                                        onChange={(e: any) => setNewProgramData(prev => ({ ...prev, class_id: e.target.value }))}
+                                        onChange={(e: any) => setNewProgramData((prev: any) => ({ ...prev, class_id: e.target.value }))}
                                         required
                                         disabled={!newProgramData.program_id || (programs.find(p => p.id === newProgramData.program_id)?.variants?.length > 0 && !newProgramData.variant_id)}
                                     >
@@ -948,7 +948,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
                                             name="start_session" 
                                             type="number" 
                                             value={newProgramData.start_session} 
-                                            onChange={(e: any) => setNewProgramData(prev => ({ ...prev, start_session: e.target.value }))} 
+                                            onChange={(e: any) => setNewProgramData((prev: any) => ({ ...prev, start_session: e.target.value }))} 
                                             placeholder="e.g. 1" 
                                             required 
                                         />
@@ -962,7 +962,7 @@ export function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalP
 
                                 {/* Custom Checkbox Card */}
                                 <div 
-                                    onClick={() => setNewProgramData(prev => ({ ...prev, include_next_term: !prev.include_next_term }))}
+                                    onClick={() => setNewProgramData((prev: any) => ({ ...prev, include_next_term: !prev.include_next_term }))}
                                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-4 mt-4 ${
                                         newProgramData.include_next_term 
                                             ? 'bg-indigo-50/50 border-indigo-200' 
